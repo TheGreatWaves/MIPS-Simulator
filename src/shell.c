@@ -354,9 +354,21 @@ void init_memory() {
 /* Purpose   : Load program and service routines into mem.    */
 /*                                                            */
 /**************************************************************/
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)  \
+  ((byte) & 0x80 ? '1' : '0'), \
+  ((byte) & 0x40 ? '1' : '0'), \
+  ((byte) & 0x20 ? '1' : '0'), \
+  ((byte) & 0x10 ? '1' : '0'), \
+  ((byte) & 0x08 ? '1' : '0'), \
+  ((byte) & 0x04 ? '1' : '0'), \
+  ((byte) & 0x02 ? '1' : '0'), \
+  ((byte) & 0x01 ? '1' : '0') 
+
 void load_program(char *program_filename) {                   
   FILE * prog;
   int ii, word;
+  char* wordd;
 
   /* Open program file. */
   prog = fopen(program_filename, "r");
@@ -365,12 +377,24 @@ void load_program(char *program_filename) {
     exit(-1);
   }
 
+  printf("Opened: %s\n", program_filename);
+
   /* Read in the program. */
 
+
   ii = 0;
-  while (fscanf(prog, "%x\n", &word) != EOF) {
+  while (fscanf(prog, "%x\n",&word) != EOF) {
     mem_write_32(MEM_TEXT_START + ii, word);
     ii += 4;
+    printf("got:"
+      BYTE_TO_BINARY_PATTERN " " 
+      BYTE_TO_BINARY_PATTERN " " 
+      BYTE_TO_BINARY_PATTERN " " 
+      BYTE_TO_BINARY_PATTERN "\n", 
+      BYTE_TO_BINARY(word>>24), 
+      BYTE_TO_BINARY(word>>16), 
+      BYTE_TO_BINARY(word>>8), 
+      BYTE_TO_BINARY(word));
   }
 
   CURRENT_STATE.PC = MEM_TEXT_START;
