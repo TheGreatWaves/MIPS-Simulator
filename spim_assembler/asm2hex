@@ -47,6 +47,7 @@ for line in lines:
     bin_value = f'{line:0>32b}'
     instr = int(bin_value[:6], 2)
     if instr==0:
+        res.append(hex(int(bin_value, 2)))
         continue
     bin_value = swap(bin_value, 6, 5, 11, 5)
     res.append(hex(int(bin_value, 2)))
