@@ -18,7 +18,19 @@
   x(PADDING)       \
   x(PADDING)       \
   x(ADDIU)         \
-  x(ADDI)
+  x(ADDI)          \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       
 
 #define ENUMERATE(OP) OP,
 enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
@@ -38,11 +50,18 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 /////////////////////////////////////
 // NOTE(Appy): Instructions
 
-#define u32t(V) (cast(uint32_t, V))
+#define u32t(V)  (cast(uint32_t, V))
 #define ISPECIAL u32t(0x00)
-#define IADDI       u32t(0x08)
-#define IADDIU      u32t(0x09)
-#define ISYSCALL    u32t(0xC)
+#define IADDI    u32t(0x08)
+#define IADDIU   u32t(0x09)
+
+
+/////////////////////////////////////
+// NOTE(Appy): Special instructions
+
+#define SYSCALL u32t(0xC)
+#define ADD     u32t(0x20)
+#define OR      u32t(0x25)
 
 /////////////////////////////////////
 // NOTE(Appy): Segment sizes
@@ -51,6 +70,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define OP_SIZE 6
 #define RS_SIZE 5
 #define RT_SIZE 5
+#define RD_SIZE 5
 #define IM_SIZE 16
 #define CD_SIZE 6
 
@@ -60,6 +80,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define OP_POS (INSTR_SIZE-OP_SIZE)
 #define RS_POS (OP_POS-RS_SIZE)
 #define RT_POS (RS_POS-RT_SIZE)
+#define RD_POS (RT_POS-RD_SIZE)
 #define IM_POS (RT_POS-IM_SIZE)
 #define CD_POS (0)
 
@@ -71,6 +92,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define GET_OP(addr) GET_BLOCK(addr, OP_POS, OP_SIZE)
 #define GET_RS(addr) GET_BLOCK(addr, RS_POS, RS_SIZE)
 #define GET_RT(addr) GET_BLOCK(addr, RT_POS, RT_SIZE)
+#define GET_RD(addr) GET_BLOCK(addr, RD_POS, RD_SIZE)
 #define GET_IM(addr) GET_BLOCK(addr, IM_POS, IM_SIZE)
 
 /////////////////////////////////////
@@ -96,6 +118,7 @@ HANDLER(IADDIU)
   uint16_t imm   = GET_IM(mem);
   int result = ((uint32_t)imm);
   if (result & MASK1(1, 15)) { result |= MASK1(16,16); }
+  gprint(CURRENT_STATE.REGS[rs] + imm);
   NEXT_STATE.REGS[rt] = CURRENT_STATE.REGS[rs] + imm;
 }
 
@@ -104,13 +127,25 @@ HANDLER(ISPECIAL)
   uint8_t code = GET_BLOCK(mem, CD_POS, CD_SIZE);
   switch(code)
   {
-    case ISYSCALL:
-    {
+    case SYSCALL:
+    {     
       if (CURRENT_STATE.REGS[R_V0] == 0x0A)
       {
         RUN_BIT = FALSE;
         break;
       }  
+    }
+    case ADD:
+    {
+      uint8_t rs = GET_RS(mem);
+      uint8_t rt = GET_RT(mem);
+      uint8_t rd = GET_RD(mem);
+      NEXT_STATE.REGS[rd] = CURRENT_STATE.REGS[rs] + CURRENT_STATE.REGS[rt];
+      break;
+    }
+    case OR:
+    {
+      gprint("HELLO");
     }
   }
 }
@@ -131,10 +166,6 @@ void process_instruction()
   DISPATCH(instr) 
   {
     LBL(ADDI):
-    {
-      CALL_HANDLER(IADDI);
-      NEXT;
-    }
     LBL(ADDIU):
     {
       CALL_HANDLER(IADDIU);
