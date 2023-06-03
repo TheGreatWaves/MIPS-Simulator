@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include "shell.h"
 #include "utils.h"
@@ -53,12 +54,15 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define u32t(V)  (cast(uint32_t, V))
 
 /////////////////////////////////////
-// NOTE(Appy): Special instructions
+// NOTE(Appy): R-Type instructions
 
-#define SYSCALL u32t(0xC)
+#define SLL     u32t(0x00)
 #define ADD     u32t(0x20)
 #define ADDU    u32t(0x21)
+#define AND     u32t(0x24)
+#define SUBU    u32t(0x23)
 #define OR      u32t(0x25)
+#define SYSCALL u32t(0xC)
 
 /////////////////////////////////////
 // NOTE(Appy): Segment sizes
@@ -68,6 +72,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define RS_SIZE     5 
 #define RT_SIZE     5
 #define RD_SIZE     5
+#define SA_SIZE     5
 #define IM_SIZE    16
 #define CD_SIZE     6
 #define SHAMT_SIZE  5
@@ -85,6 +90,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define RS_POS    (OP_POS-RS_SIZE)
 #define RT_POS    (RS_POS-RT_SIZE)
 #define RD_POS    (RT_POS-RD_SIZE)
+#define SA_POS    (RD_POS-SA_SIZE)
 #define IM_POS    (RT_POS-IM_SIZE)
 #define CD_POS    (0)
 #define SHAMT_POS (6)
@@ -124,10 +130,16 @@ HANDLER(ADDIU)
 
 HANDLER(SPECIAL)
 {
+  /* Maybe not ideal. */
   uint8_t code = GET(CD, mem);
-  uint8_t rs = GET(RS, mem);
-  uint8_t rt = GET(RT, mem);
-  uint8_t rd = GET(RD, mem);
+  uint8_t rs   = GET(RS, mem);
+  uint8_t rt   = GET(RT, mem);
+  uint8_t rd   = GET(RD, mem);
+  uint8_t sa   = GET(SA, mem);
+
+
+  // Note(Appy): Sorry for hacks
+  #define APPLY(dest, a, op, b) NEXT_STATE.REGS[dest] = CURRENT_STATE.REGS[a] op CURRENT_STATE.REGS[b];
 
   switch(code)
   {
@@ -142,15 +154,31 @@ HANDLER(SPECIAL)
     case ADDU: 
     case ADD:
     {
-      NEXT_STATE.REGS[rd] = CURRENT_STATE.REGS[rs] + CURRENT_STATE.REGS[rt];
+      APPLY(rd, rs, +, rt);
       break;
     }
     case OR:
     {
-      NEXT_STATE.REGS[rd] = CURRENT_STATE.REGS[rs] | CURRENT_STATE.REGS[rt];
+      APPLY(rd, rs, |, rt);
+      break;
+    }
+    case AND:
+    {
+      APPLY(rd, rs, &, rt);
+      break;
+    }
+    case SLL:
+    {
+      APPLY(rd, rt, <<, sa);
+      break;
+    }
+    case SUBU:
+    {
+      APPLY(rd, rs, -, rt);
       break;
     }
   }
+  #undef APPLY
 }
 
 HANDLER(ADDI) { CALL_HANDLER(ADDIU); }
