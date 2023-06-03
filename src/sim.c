@@ -48,52 +48,52 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define R_V0 2
 
 /////////////////////////////////////
-// NOTE(Appy): Instructions
+// NOTE(Appy): Cast
 
 #define u32t(V)  (cast(uint32_t, V))
-#define ISPECIAL u32t(0x00)
-#define IADDI    u32t(0x08)
-#define IADDIU   u32t(0x09)
-
 
 /////////////////////////////////////
 // NOTE(Appy): Special instructions
 
 #define SYSCALL u32t(0xC)
 #define ADD     u32t(0x20)
+#define ADDU    u32t(0x21)
 #define OR      u32t(0x25)
 
 /////////////////////////////////////
 // NOTE(Appy): Segment sizes
 
 #define INSTR_SIZE 32
-#define OP_SIZE 6
-#define RS_SIZE 5
-#define RT_SIZE 5
-#define RD_SIZE 5
-#define IM_SIZE 16
-#define CD_SIZE 6
+#define OP_SIZE     6 
+#define RS_SIZE     5 
+#define RT_SIZE     5
+#define RD_SIZE     5
+#define IM_SIZE    16
+#define CD_SIZE     6
+#define SHAMT_SIZE  5
 
 /////////////////////////////////////
 // NOTE(Appy): Segment positions
+//             
+// RS    - Operand A in register file
+// RT    - Operand B in register file
+// RD    - Result destination in register file
+// SHAMT - Shift amount
+// CD    - Function code
 
-#define OP_POS (INSTR_SIZE-OP_SIZE)
-#define RS_POS (OP_POS-RS_SIZE)
-#define RT_POS (RS_POS-RT_SIZE)
-#define RD_POS (RT_POS-RD_SIZE)
-#define IM_POS (RT_POS-IM_SIZE)
-#define CD_POS (0)
+#define OP_POS    (INSTR_SIZE-OP_SIZE)
+#define RS_POS    (OP_POS-RS_SIZE)
+#define RT_POS    (RS_POS-RT_SIZE)
+#define RD_POS    (RT_POS-RD_SIZE)
+#define IM_POS    (RT_POS-IM_SIZE)
+#define CD_POS    (0)
+#define SHAMT_POS (6)
 
 /////////////////////////////////////
 // NOTE(Appy): Segment getters
 
 #define GET_BLOCK(addr, start, size) ((addr>>(start)) & MASK(size))
-
-#define GET_OP(addr) GET_BLOCK(addr, OP_POS, OP_SIZE)
-#define GET_RS(addr) GET_BLOCK(addr, RS_POS, RS_SIZE)
-#define GET_RT(addr) GET_BLOCK(addr, RT_POS, RT_SIZE)
-#define GET_RD(addr) GET_BLOCK(addr, RD_POS, RD_SIZE)
-#define GET_IM(addr) GET_BLOCK(addr, IM_POS, IM_SIZE)
+#define GET(SEG, addr) GET_BLOCK(addr, SEG##_POS, SEG##_SIZE)
 
 /////////////////////////////////////
 // NOTE(Appy): Uninspiring helpers
@@ -111,20 +111,24 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 /////////////////////////////////////
 // NOTE(Appy): Handlers
 
-HANDLER(IADDIU)
+HANDLER(ADDIU)
 {
-  uint8_t  rs    = GET_RS(mem);
-  uint8_t  rt    = GET_RT(mem);
-  uint16_t imm   = GET_IM(mem);
+  uint8_t  rs    = GET(RS, mem);
+  uint8_t  rt    = GET(RT, mem);
+  uint16_t imm   = GET(IM, mem);
   int result = ((uint32_t)imm);
   if (result & MASK1(1, 15)) { result |= MASK1(16,16); }
   gprint(CURRENT_STATE.REGS[rs] + imm);
   NEXT_STATE.REGS[rt] = CURRENT_STATE.REGS[rs] + imm;
 }
 
-HANDLER(ISPECIAL)
+HANDLER(SPECIAL)
 {
-  uint8_t code = GET_BLOCK(mem, CD_POS, CD_SIZE);
+  uint8_t code = GET(CD, mem);
+  uint8_t rs = GET(RS, mem);
+  uint8_t rt = GET(RT, mem);
+  uint8_t rd = GET(RD, mem);
+
   switch(code)
   {
     case SYSCALL:
@@ -132,25 +136,24 @@ HANDLER(ISPECIAL)
       if (CURRENT_STATE.REGS[R_V0] == 0x0A)
       {
         RUN_BIT = FALSE;
-        break;
       }  
+      break;
     }
+    case ADDU: 
     case ADD:
     {
-      uint8_t rs = GET_RS(mem);
-      uint8_t rt = GET_RT(mem);
-      uint8_t rd = GET_RD(mem);
       NEXT_STATE.REGS[rd] = CURRENT_STATE.REGS[rs] + CURRENT_STATE.REGS[rt];
       break;
     }
     case OR:
     {
-      gprint("HELLO");
+      NEXT_STATE.REGS[rd] = CURRENT_STATE.REGS[rs] | CURRENT_STATE.REGS[rt];
+      break;
     }
   }
 }
 
-HANDLER(IADDI) { CALL_HANDLER(IADDIU); }
+HANDLER(ADDI) { CALL_HANDLER(ADDIU); }
 
 void process_instruction()
 {
@@ -158,7 +161,7 @@ void process_instruction()
    * values in NEXT_STATE. You can call mem_read_32() and mem_write_32() to
    * access memory. */
   uint32_t mem = mem_read_32(CURRENT_STATE.PC);
-  uint8_t instr = GET_OP(mem);
+  uint8_t instr = GET(OP,mem);
 
   static const void *jumpTable[] = { OPCODES(MK_LBL) MK_LBL(NEXT_STATE) };
 
@@ -168,15 +171,16 @@ void process_instruction()
     LBL(ADDI):
     LBL(ADDIU):
     {
-      CALL_HANDLER(IADDIU);
+      CALL_HANDLER(ADDIU);
       NEXT;
     }
     LBL(SPECIAL):
     {
-      CALL_HANDLER(ISPECIAL);
+      CALL_HANDLER(SPECIAL);
       NEXT;
     }
-    LBL(PADDING): {
+    LBL(PADDING): 
+    {
       NEXT;
     }
   }
