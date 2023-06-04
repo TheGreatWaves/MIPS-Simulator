@@ -1,4 +1,3 @@
-#include <stdint.h>
 #include <stdio.h>
 #include "shell.h"
 #include "utils.h"
@@ -139,24 +138,25 @@ HANDLER(SPECIAL)
 
   switch(code)
   {
-    case SYSCALL:
+    case SYSCALL:                        // System call
     {     
       if (CURRENT_STATE.REGS[R_V0] == 0x0A)
       {
         RUN_BIT = FALSE;
       }  
+      /* else do nothing... increment as usual */
       break;
     }
     case ADDU: 
-    case ADD:  { RD = RS + RT; break; }
-    case SUB:  { RD = RS - RT; break; }
-    case OR:   { RD = RS | RT; break; }
-    case AND:  { RD = RS & RT; break; }
-    case SUBU: { RD = RS - RT; break; }
-    case XOR:  { RD = RS ^ RT; break; }
-    case SLL:  { RD = RT << SA; break; }
-    case SRL:  { RD = RT >> SA; break; }
-    case SRA:
+    case ADD:  { RD = RS + RT; break; }  // Addition
+    case SUB:  { RD = RS - RT; break; }  // Subtraction
+    case OR:   { RD = RS | RT; break; }  // Bit Or
+    case AND:  { RD = RS & RT; break; }  // Bit And
+    case SUBU: { RD = RS - RT; break; }  // Subtraction Unsigned
+    case XOR:  { RD = RS ^ RT; break; }  // Exclusive Or
+    case SLL:  { RD = RT << SA; break; } // Shift Left
+    case SRL:  { RD = RT >> SA; break; } // Shirt Right
+    case SRA:                            // Shift Right Addition
     {
       uint8_t  sa      = SA;
       uint32_t operand = RT;
@@ -187,23 +187,20 @@ void process_instruction()
   uint32_t mem = mem_read_32(CURRENT_STATE.PC);
   uint8_t instr = GET(OP, mem);
 
+  /* Instruction jump tables */
   static const void *jumpTable[] = { OPCODES(MK_LBL) MK_LBL(NEXT_STATE) };
 
-  #define HANDLE_BASIC(OP) LBL(OP):{CALL_HANDLER(OP);NEXT;}
+  /* Helpers */
   #define END_LABEL LBL(NEXT_STATE): 
-
-  #define RS  CURRENT_STATE.REGS[GET(RS, mem)]
-  #define RT  NEXT_STATE.REGS[GET(RT, mem)]
-  #define IMM GET(IM, mem)
+  #define RS  (CURRENT_STATE.REGS[GET(RS, mem)])
+  #define RT  (NEXT_STATE.REGS[GET(RT, mem)])
+  #define IMM (GET(IM, mem))
 
   /* Dispatch the instruction. */
   DISPATCH(instr) 
   {
-    LBL(SPECIAL):
-    {
-      CALL_HANDLER(SPECIAL);
-      NEXT;
-    }
+    /* First six bits are 0s */
+    LBL(SPECIAL): { CALL_HANDLER(SPECIAL); NEXT; }
 
     /* Basic cases, none of these messes control flow */
     LBL(ADDI):
@@ -211,6 +208,7 @@ void process_instruction()
     {
       uint32_t result = u32t(IMM);
 
+      // TODO(Appy): Macro abuse this?
       /* Bit extend. */
       if (result & MASK1(1, 15)) { result |= MASK1(16,16); }
       RT = RS + result;
@@ -224,12 +222,16 @@ void process_instruction()
     LBL(PADDING):  { NEXT; }
   }
 
+  /* This is place in this way in order to allow disabling of threaded code */
   END_LABEL 
   {
+    /* Increment the program counter */
     NEXT_STATE.PC = CURRENT_STATE.PC + 4;
   }
 
   /* Undefine guards */
+  #undef END_LABEL
+
   #ifdef RS
     #undef RS 
   #endif
