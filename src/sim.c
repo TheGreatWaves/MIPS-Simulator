@@ -22,10 +22,10 @@
   x(ADDI)          \
   x(PADDING)       \
   x(PADDING)       \
-  x(PADDING)       \
+  x(ANDI)          \
   x(PADDING)       \
   x(XORI)          \
-  x(PADDING)       \
+  x(LUI)           \
   x(PADDING)       \
   x(PADDING)       \
   x(PADDING)       \
@@ -40,7 +40,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 // NOTE(Appy): Utils
 
 #define MASK(n) (~((~((uint32_t)0)) << n)) // creates a mask of n 1s
-#define MASK1(n, p) (MASK(n)<<p)
+#define MASK1(n, p) (MASK(n)<<(p))
 #define MASK0(n, p) (~(MASK1))
 
 /////////////////////////////////////
@@ -57,8 +57,11 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 // NOTE(Appy): R-Type instructions
 
 #define SLL     u32t(0x00)
+#define SRL     u32t(0x02)
+#define SRA     u32t(0x03)
 #define ADD     u32t(0x20)
 #define ADDU    u32t(0x21)
+#define SUB     u32t(0x22)
 #define AND     u32t(0x24)
 #define SUBU    u32t(0x23)
 #define OR      u32t(0x25)
@@ -110,7 +113,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define HANDLER(OP) void instr_##OP(uint32_t mem) 
 #define CALL_HANDLER(OP) instr_##OP(mem) 
 #define DISPATCH(code) goto *jumpTable[ code ];
-#define NEXT goto *jumpTable[ cast(u32, NUMBER_OF_OPS) ]
+#define NEXT goto *jumpTable[ u32t(NUMBER_OF_OPS) ]
 #define JUMPTABLE static const void *jumpTable[]
 #define MK_LBL(OP) &&lbl_##OP,
 #define LBL(OP) lbl_##OP
@@ -120,9 +123,9 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 
 HANDLER(ADDIU)
 {
-  uint8_t  rs    = GET(RS, mem);
-  uint8_t  rt    = GET(RT, mem);
-  uint16_t imm   = GET(IM, mem);
+  uint8_t  rs  = GET(RS, mem);
+  uint8_t  rt  = GET(RT, mem);
+  uint16_t imm = GET(IM, mem);
   int result = ((uint32_t)imm);
 
   /* Bit extend. */
@@ -132,10 +135,31 @@ HANDLER(ADDIU)
 
 HANDLER(XORI)
 {
-  uint8_t  rs    = GET(RS, mem);
-  uint8_t  rt    = GET(RT, mem);
-  uint16_t imm   = GET(IM, mem);
+  uint8_t  rs  = GET(RS, mem);
+  uint8_t  rt  = GET(RT, mem);
+  uint16_t imm = GET(IM, mem);
   NEXT_STATE.REGS[rt] = u32t(CURRENT_STATE.REGS[rs]) ^ u32t(imm);
+}
+
+HANDLER(ANDI)
+{
+  uint8_t  rs  = GET(RS, mem);
+  uint8_t  rt  = GET(RT, mem);
+  uint16_t imm = GET(IM, mem);
+  NEXT_STATE.REGS[rt] = u32t(CURRENT_STATE.REGS[rs]) & u32t(imm);
+}
+
+/** 
+ * Load Upper Immediate (15)
+ *
+ * The 16-bit immediate is shifted left by 16 bits.
+ * The result is placed into the register rt.
+ */
+HANDLER(LUI)
+{
+  uint8_t  rt  = GET(RT, mem);
+  uint16_t imm = GET(IM, mem);
+  NEXT_STATE.REGS[rt] = (imm << 16);
 }
 
 HANDLER(SPECIAL)
@@ -144,7 +168,8 @@ HANDLER(SPECIAL)
   uint8_t code = GET(CD, mem);
 
   // Note(Appy): Sorry for hacks
-  #define APPLY(dest, a, op, b) NEXT_STATE.REGS[dest] = CURRENT_STATE.REGS[a] op CURRENT_STATE.REGS[b]
+  #define APPLY(dest, a, op, b) \
+  NEXT_STATE.REGS[ GET(dest, mem) ] = CURRENT_STATE.REGS[ GET(a, mem) ] op CURRENT_STATE.REGS[ GET(b, mem) ]
 
   switch(code)
   {
@@ -157,30 +182,10 @@ HANDLER(SPECIAL)
       break;
     }
     case ADDU: 
-    case ADD:
-    {
-      uint8_t rs   = GET(RS, mem);
-      uint8_t rt   = GET(RT, mem);
-      uint8_t rd   = GET(RD, mem);
-      APPLY(rd, rs, +, rt);
-      break;
-    }
-    case OR:
-    {
-      uint8_t rs   = GET(RS, mem);
-      uint8_t rt   = GET(RT, mem);
-      uint8_t rd   = GET(RD, mem);
-      APPLY(rd, rs, |, rt);
-      break;
-    }
-    case AND:
-    {
-      uint8_t rs   = GET(RS, mem);
-      uint8_t rt   = GET(RT, mem);
-      uint8_t rd   = GET(RD, mem);
-      APPLY(rd, rs, &, rt);
-      break;
-    }
+    case ADD: { APPLY(RD, RS, +, RT); break; }
+    case SUB: { APPLY(RD, RS, -, RT); break; }
+    case OR: { APPLY(RD, RS, |, RT); break; }
+    case AND: { APPLY(RD, RS, &, RT); break; }
     case SLL:
     {
       uint8_t rt   = GET(RT, mem);
@@ -189,22 +194,33 @@ HANDLER(SPECIAL)
       NEXT_STATE.REGS[rd] = CURRENT_STATE.REGS[rt] << sa;
       break;
     }
-    case SUBU:
+    case SRL:
     {
-      uint8_t rs   = GET(RS, mem);
       uint8_t rt   = GET(RT, mem);
       uint8_t rd   = GET(RD, mem);
-      APPLY(rd, rs, -, rt);
+      uint8_t sa   = GET(SA, mem);
+      NEXT_STATE.REGS[rd] = CURRENT_STATE.REGS[rt] >> sa;
       break;
     }
-    case XOR:
+    case SRA:
     {
-      uint8_t rs   = GET(RS, mem);
-      uint8_t rt   = GET(RT, mem);
-      uint8_t rd   = GET(RD, mem);
-      APPLY(rd, rs, ^, rt);
+      uint8_t rt       = GET(RT, mem);
+      uint8_t rd       = GET(RD, mem);
+      uint8_t sa       = GET(SA, mem);
+      uint32_t operand = CURRENT_STATE.REGS[rt];
+      uint32_t result  = operand >> sa;
+
+      /* Sign extension */
+      if (operand & MASK1(1, 31))
+      {
+         result |= MASK1(sa, 32-sa); 
+      }
+        
+      NEXT_STATE.REGS[rd] = result;
       break;
     }
+    case SUBU: { APPLY(RD, RS, -, RT); break; }
+    case XOR: { APPLY(RD, RS, ^, RT); break; }
   }
   #undef APPLY
 }
@@ -238,6 +254,16 @@ void process_instruction()
     LBL(XORI):
     {
       CALL_HANDLER(XORI);
+      NEXT;
+    }
+    LBL(ANDI):
+    {
+      CALL_HANDLER(ANDI);
+      NEXT;
+    }
+    LBL(LUI):
+    {
+      CALL_HANDLER(LUI);
       NEXT;
     }
     /* Default case. */
