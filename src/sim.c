@@ -122,58 +122,20 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 /////////////////////////////////////
 // NOTE(Appy): Handlers
 
-HANDLER(ADDIU)
-{
-  uint8_t  rs  = GET(RS, mem);
-  uint8_t  rt  = GET(RT, mem);
-  uint16_t imm = GET(IM, mem);
-  int result = u32t(imm);
-
-  /* Bit extend. */
-  if (result & MASK1(1, 15)) { result |= MASK1(16,16); }
-  NEXT_STATE.REGS[rt] = CURRENT_STATE.REGS[rs] + imm;
-}
-
-/* Probably should not */
-FORWARD_HANDLER(ADDI, ADDIU);
-
-HANDLER(XORI)
-{
-  uint8_t  rs  = GET(RS, mem);
-  uint8_t  rt  = GET(RT, mem);
-  uint16_t imm = GET(IM, mem);
-  NEXT_STATE.REGS[rt] = u32t(CURRENT_STATE.REGS[rs]) ^ u32t(imm);
-}
-
-HANDLER(ANDI)
-{
-  uint8_t  rs  = GET(RS, mem);
-  uint8_t  rt  = GET(RT, mem);
-  uint16_t imm = GET(IM, mem);
-  NEXT_STATE.REGS[rt] = u32t(CURRENT_STATE.REGS[rs]) & u32t(imm);
-}
-
-/** 
- * Load Upper Immediate (15)
- *
- * The 16-bit immediate is shifted left by 16 bits.
- * The result is placed into the register rt.
- */
-HANDLER(LUI)
-{
-  uint8_t  rt  = GET(RT, mem);
-  uint16_t imm = GET(IM, mem);
-  NEXT_STATE.REGS[rt] = (imm << 16);
-}
-
 HANDLER(SPECIAL)
 {
-  /* Maybe not ideal. */
   uint8_t code = GET(CD, mem);
 
-  // Note(Appy): Sorry for hacks
-  #define APPLY(dest, a, op, b) \
-  NEXT_STATE.REGS[ GET(dest, mem) ] = CURRENT_STATE.REGS[ GET(a, mem) ] op CURRENT_STATE.REGS[ GET(b, mem) ]
+  /* Undefine register helpers from process instruction */
+  #undef RS 
+  #undef RT 
+  #undef IMM 
+
+  /* Register helpers */
+  #define RD (NEXT_STATE.REGS[ GET(RD, mem) ])
+  #define RS (CURRENT_STATE.REGS[ GET(RS, mem) ])
+  #define RT (CURRENT_STATE.REGS[ GET(RT, mem) ])
+  #define SA (GET(SA, mem))
 
   switch(code)
   {
@@ -186,35 +148,19 @@ HANDLER(SPECIAL)
       break;
     }
     case ADDU: 
-    case ADD:  { APPLY(RD, RS, +, RT); break; }
-    case SUB:  { APPLY(RD, RS, -, RT); break; }
-    case OR:   { APPLY(RD, RS, |, RT); break; }
-    case AND:  { APPLY(RD, RS, &, RT); break; }
-    case SUBU: { APPLY(RD, RS, -, RT); break; }
-    case XOR:  { APPLY(RD, RS, ^, RT); break; }
-    case SLL:
-    {
-      uint8_t rt   = GET(RT, mem);
-      uint8_t rd   = GET(RD, mem);
-      uint8_t sa   = GET(SA, mem);
-      NEXT_STATE.REGS[rd] = CURRENT_STATE.REGS[rt] << sa;
-      break;
-    }
-    case SRL:
-    {
-      uint8_t rt   = GET(RT, mem);
-      uint8_t rd   = GET(RD, mem);
-      uint8_t sa   = GET(SA, mem);
-      NEXT_STATE.REGS[rd] = CURRENT_STATE.REGS[rt] >> sa;
-      break;
-    }
+    case ADD:  { RD = RS + RT; break; }
+    case SUB:  { RD = RS - RT; break; }
+    case OR:   { RD = RS | RT; break; }
+    case AND:  { RD = RS & RT; break; }
+    case SUBU: { RD = RS - RT; break; }
+    case XOR:  { RD = RS ^ RT; break; }
+    case SLL:  { RD = RT << SA; break; }
+    case SRL:  { RD = RT >> SA; break; }
     case SRA:
     {
-      uint8_t rt       = GET(RT, mem);
-      uint8_t rd       = GET(RD, mem);
-      uint8_t sa       = GET(SA, mem);
-      uint32_t operand = CURRENT_STATE.REGS[rt];
-      uint32_t result  = operand >> sa;
+      uint8_t  sa      = SA;
+      uint32_t operand = RT;
+      uint32_t result  = (operand >> sa);
 
       /* Sign extension */
       if (operand & MASK1(1, 31))
@@ -222,11 +168,15 @@ HANDLER(SPECIAL)
          result |= MASK1(sa, 32-sa); 
       }
         
-      NEXT_STATE.REGS[rd] = result;
+      RD = result;
       break;
     }
   }
-  #undef APPLY
+
+  #undef RD
+  #undef RS
+  #undef RT
+  #undef SA
 }
 
 void process_instruction()
@@ -240,21 +190,55 @@ void process_instruction()
   static const void *jumpTable[] = { OPCODES(MK_LBL) MK_LBL(NEXT_STATE) };
 
   #define HANDLE_BASIC(OP) LBL(OP):{CALL_HANDLER(OP);NEXT;}
+  #define END_LABEL LBL(NEXT_STATE): 
+
+  #define RS  CURRENT_STATE.REGS[GET(RS, mem)]
+  #define RT  NEXT_STATE.REGS[GET(RT, mem)]
+  #define IMM GET(IM, mem)
 
   /* Dispatch the instruction. */
   DISPATCH(instr) 
   {
+    LBL(SPECIAL):
+    {
+      CALL_HANDLER(SPECIAL);
+      NEXT;
+    }
+
     /* Basic cases, none of these messes control flow */
-    HANDLE_BASIC(ADDI);
-    HANDLE_BASIC(ADDIU);
-    HANDLE_BASIC(SPECIAL);
-    HANDLE_BASIC(XORI);
-    HANDLE_BASIC(ANDI);
-    HANDLE_BASIC(LUI);
+    LBL(ADDI):
+    LBL(ADDIU):
+    {
+      uint32_t result = u32t(IMM);
+
+      /* Bit extend. */
+      if (result & MASK1(1, 15)) { result |= MASK1(16,16); }
+      RT = RS + result;
+      NEXT;
+    }
+    LBL(XORI): { RT = RS ^ u32t(IMM); NEXT; }    
+    LBL(ANDI): { RT = RS & u32t(IMM); NEXT; }
+    LBL(LUI):  { RT = (IMM << 16); NEXT; }
 
     /* Default case. */
     LBL(PADDING):  { NEXT; }
   }
 
-  LBL(NEXT_STATE): { NEXT_STATE.PC = CURRENT_STATE.PC + 4; }
+  END_LABEL 
+  {
+    NEXT_STATE.PC = CURRENT_STATE.PC + 4;
+  }
+
+  /* Undefine guards */
+  #ifdef RS
+    #undef RS 
+  #endif
+
+  #ifdef RT
+    #undef RT 
+  #endif
+
+  #ifdef IMM
+    #undef IMM 
+  #endif
 }
