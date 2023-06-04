@@ -24,7 +24,7 @@
   x(PADDING)       \
   x(PADDING)       \
   x(PADDING)       \
-  x(PADDING)       \
+  x(XORI)          \
   x(PADDING)       \
   x(PADDING)       \
   x(PADDING)       \
@@ -62,6 +62,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define AND     u32t(0x24)
 #define SUBU    u32t(0x23)
 #define OR      u32t(0x25)
+#define XOR     u32t(0x26)
 #define SYSCALL u32t(0xC)
 
 /////////////////////////////////////
@@ -123,23 +124,27 @@ HANDLER(ADDIU)
   uint8_t  rt    = GET(RT, mem);
   uint16_t imm   = GET(IM, mem);
   int result = ((uint32_t)imm);
+
+  /* Bit extend. */
   if (result & MASK1(1, 15)) { result |= MASK1(16,16); }
-  gprint(CURRENT_STATE.REGS[rs] + imm);
   NEXT_STATE.REGS[rt] = CURRENT_STATE.REGS[rs] + imm;
+}
+
+HANDLER(XORI)
+{
+  uint8_t  rs    = GET(RS, mem);
+  uint8_t  rt    = GET(RT, mem);
+  uint16_t imm   = GET(IM, mem);
+  NEXT_STATE.REGS[rt] = u32t(CURRENT_STATE.REGS[rs]) ^ u32t(imm);
 }
 
 HANDLER(SPECIAL)
 {
   /* Maybe not ideal. */
   uint8_t code = GET(CD, mem);
-  uint8_t rs   = GET(RS, mem);
-  uint8_t rt   = GET(RT, mem);
-  uint8_t rd   = GET(RD, mem);
-  uint8_t sa   = GET(SA, mem);
-
 
   // Note(Appy): Sorry for hacks
-  #define APPLY(dest, a, op, b) NEXT_STATE.REGS[dest] = CURRENT_STATE.REGS[a] op CURRENT_STATE.REGS[b];
+  #define APPLY(dest, a, op, b) NEXT_STATE.REGS[dest] = CURRENT_STATE.REGS[a] op CURRENT_STATE.REGS[b]
 
   switch(code)
   {
@@ -154,27 +159,50 @@ HANDLER(SPECIAL)
     case ADDU: 
     case ADD:
     {
+      uint8_t rs   = GET(RS, mem);
+      uint8_t rt   = GET(RT, mem);
+      uint8_t rd   = GET(RD, mem);
       APPLY(rd, rs, +, rt);
       break;
     }
     case OR:
     {
+      uint8_t rs   = GET(RS, mem);
+      uint8_t rt   = GET(RT, mem);
+      uint8_t rd   = GET(RD, mem);
       APPLY(rd, rs, |, rt);
       break;
     }
     case AND:
     {
+      uint8_t rs   = GET(RS, mem);
+      uint8_t rt   = GET(RT, mem);
+      uint8_t rd   = GET(RD, mem);
       APPLY(rd, rs, &, rt);
       break;
     }
     case SLL:
     {
-      APPLY(rd, rt, <<, sa);
+      uint8_t rt   = GET(RT, mem);
+      uint8_t rd   = GET(RD, mem);
+      uint8_t sa   = GET(SA, mem);
+      NEXT_STATE.REGS[rd] = CURRENT_STATE.REGS[rt] << sa;
       break;
     }
     case SUBU:
     {
+      uint8_t rs   = GET(RS, mem);
+      uint8_t rt   = GET(RT, mem);
+      uint8_t rd   = GET(RD, mem);
       APPLY(rd, rs, -, rt);
+      break;
+    }
+    case XOR:
+    {
+      uint8_t rs   = GET(RS, mem);
+      uint8_t rt   = GET(RT, mem);
+      uint8_t rd   = GET(RD, mem);
+      APPLY(rd, rs, ^, rt);
       break;
     }
   }
@@ -189,7 +217,7 @@ void process_instruction()
    * values in NEXT_STATE. You can call mem_read_32() and mem_write_32() to
    * access memory. */
   uint32_t mem = mem_read_32(CURRENT_STATE.PC);
-  uint8_t instr = GET(OP,mem);
+  uint8_t instr = GET(OP, mem);
 
   static const void *jumpTable[] = { OPCODES(MK_LBL) MK_LBL(NEXT_STATE) };
 
@@ -207,10 +235,13 @@ void process_instruction()
       CALL_HANDLER(SPECIAL);
       NEXT;
     }
-    LBL(PADDING): 
+    LBL(XORI):
     {
+      CALL_HANDLER(XORI);
       NEXT;
     }
+    /* Default case. */
+    LBL(PADDING):  { NEXT; }
   }
 
   LBL(NEXT_STATE): { NEXT_STATE.PC = CURRENT_STATE.PC + 4; }
