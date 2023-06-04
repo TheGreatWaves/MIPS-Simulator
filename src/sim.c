@@ -112,6 +112,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define HANDLE(OP) case OP :{ instr_ ## OP(mem); break; }
 #define HANDLER(OP) void instr_##OP(uint32_t mem) 
 #define CALL_HANDLER(OP) instr_##OP(mem) 
+#define FORWARD_HANDLER(OP, TO) HANDLER(OP) { CALL_HANDLER(TO); }
 #define DISPATCH(code) goto *jumpTable[ code ];
 #define NEXT goto *jumpTable[ u32t(NUMBER_OF_OPS) ]
 #define JUMPTABLE static const void *jumpTable[]
@@ -126,12 +127,15 @@ HANDLER(ADDIU)
   uint8_t  rs  = GET(RS, mem);
   uint8_t  rt  = GET(RT, mem);
   uint16_t imm = GET(IM, mem);
-  int result = ((uint32_t)imm);
+  int result = u32t(imm);
 
   /* Bit extend. */
   if (result & MASK1(1, 15)) { result |= MASK1(16,16); }
   NEXT_STATE.REGS[rt] = CURRENT_STATE.REGS[rs] + imm;
 }
+
+/* Probably should not */
+FORWARD_HANDLER(ADDI, ADDIU);
 
 HANDLER(XORI)
 {
@@ -182,10 +186,12 @@ HANDLER(SPECIAL)
       break;
     }
     case ADDU: 
-    case ADD: { APPLY(RD, RS, +, RT); break; }
-    case SUB: { APPLY(RD, RS, -, RT); break; }
-    case OR: { APPLY(RD, RS, |, RT); break; }
-    case AND: { APPLY(RD, RS, &, RT); break; }
+    case ADD:  { APPLY(RD, RS, +, RT); break; }
+    case SUB:  { APPLY(RD, RS, -, RT); break; }
+    case OR:   { APPLY(RD, RS, |, RT); break; }
+    case AND:  { APPLY(RD, RS, &, RT); break; }
+    case SUBU: { APPLY(RD, RS, -, RT); break; }
+    case XOR:  { APPLY(RD, RS, ^, RT); break; }
     case SLL:
     {
       uint8_t rt   = GET(RT, mem);
@@ -219,13 +225,9 @@ HANDLER(SPECIAL)
       NEXT_STATE.REGS[rd] = result;
       break;
     }
-    case SUBU: { APPLY(RD, RS, -, RT); break; }
-    case XOR: { APPLY(RD, RS, ^, RT); break; }
   }
   #undef APPLY
 }
-
-HANDLER(ADDI) { CALL_HANDLER(ADDIU); }
 
 void process_instruction()
 {
@@ -237,35 +239,19 @@ void process_instruction()
 
   static const void *jumpTable[] = { OPCODES(MK_LBL) MK_LBL(NEXT_STATE) };
 
+  #define HANDLE_BASIC(OP) LBL(OP):{CALL_HANDLER(OP);NEXT;}
+
   /* Dispatch the instruction. */
   DISPATCH(instr) 
   {
-    LBL(ADDI):
-    LBL(ADDIU):
-    {
-      CALL_HANDLER(ADDIU);
-      NEXT;
-    }
-    LBL(SPECIAL):
-    {
-      CALL_HANDLER(SPECIAL);
-      NEXT;
-    }
-    LBL(XORI):
-    {
-      CALL_HANDLER(XORI);
-      NEXT;
-    }
-    LBL(ANDI):
-    {
-      CALL_HANDLER(ANDI);
-      NEXT;
-    }
-    LBL(LUI):
-    {
-      CALL_HANDLER(LUI);
-      NEXT;
-    }
+    /* Basic cases, none of these messes control flow */
+    HANDLE_BASIC(ADDI);
+    HANDLE_BASIC(ADDIU);
+    HANDLE_BASIC(SPECIAL);
+    HANDLE_BASIC(XORI);
+    HANDLE_BASIC(ANDI);
+    HANDLE_BASIC(LUI);
+
     /* Default case. */
     LBL(PADDING):  { NEXT; }
   }
