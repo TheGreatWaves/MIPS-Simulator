@@ -65,6 +65,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define SUBU    u32t(0x23)
 #define OR      u32t(0x25)
 #define XOR     u32t(0x26)
+#define DIV     u32t(0x1A)
 #define SYSCALL u32t(0xC)
 
 /////////////////////////////////////
@@ -154,6 +155,16 @@ HANDLER(SPECIAL)
     case AND:  { RD = RS & RT; break; }  // Bit And
     case SUBU: { RD = RS - RT; break; }  // Subtraction Unsigned
     case XOR:  { RD = RS ^ RT; break; }  // Exclusive Or
+    case DIV:  
+    {
+      u32 denominator = RT;
+      if (denominator != 0)
+      {
+        NEXT_STATE.LO = u32t(RS/denominator);
+        NEXT_STATE.HI = RS % denominator;
+      }
+      break;
+    }
     case SLL:  { RD = RT << SA; break; } // Shift Left
     case SRL:  { RD = RT >> SA; break; } // Shirt Right
     case SRA:                            // Shift Right Addition
