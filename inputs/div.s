@@ -8,6 +8,7 @@ main:
         addiu   $2, $zero, 512
         addu    $3, $2, $2
 	div 	$2, $3
+	divu 	$3, $2
         addiu   $2, $zero, 0xa
         syscall
         

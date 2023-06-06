@@ -42,6 +42,8 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define MASK1(n, p) (MASK(n)<<(p))
 #define MASK0(n, p) (~(MASK1))
 
+#define TWOCOMP(x) ((~(x))+1)
+
 /////////////////////////////////////
 // NOTE(Appy): Registers
 
@@ -66,6 +68,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define OR      u32t(0x25)
 #define XOR     u32t(0x26)
 #define DIV     u32t(0x1A)
+#define DIVU    u32t(0x1B)
 #define SYSCALL u32t(0xC)
 
 /////////////////////////////////////
@@ -157,11 +160,23 @@ HANDLER(SPECIAL)
     case XOR:  { RD = RS ^ RT; break; }  // Exclusive Or
     case DIV:  
     {
-      u32 denominator = RT;
+      s32 denominator = TWOCOMP(RT);
+      s32 numerator = TWOCOMP(RS);
       if (denominator != 0)
       {
-        NEXT_STATE.LO = u32t(RS/denominator);
-        NEXT_STATE.HI = RS % denominator;
+        NEXT_STATE.LO = u32t(numerator/denominator);
+        NEXT_STATE.HI = u32t(numerator % denominator);
+      }
+      break;
+    }
+    case DIVU:  
+    {
+      u32 denominator = u32t(RT);
+      u32 numerator = u32t(RS);
+      if (denominator != 0)
+      {
+        NEXT_STATE.LO = u32t(numerator/denominator);
+        NEXT_STATE.HI = numerator % denominator;
       }
       break;
     }

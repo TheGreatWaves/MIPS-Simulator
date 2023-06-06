@@ -410,7 +410,8 @@ void load_program(char *program_filename) {
 /*             and set up initial state of the machine.     */
 /*                                                          */
 /************************************************************/
-void initialize(char *program_filename, int num_prog_files) { 
+void initialize(char *program_filename, int num_prog_files) 
+{ 
   int i;
 
   init_memory();
