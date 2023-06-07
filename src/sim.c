@@ -6,12 +6,15 @@
 #define CAT_HELPER(x, s) CAT(x, s)
 #define PADDING CAT_HELPER(PAD, __COUNTER__)
 
+
+static int jump_pending = -1;
+
 /////////////////////////////////////
 // NOTE(Appy): Opcodes automation
 #define OPCODES(x) \
   x(SPECIAL)       \
   x(PADDING)       \
-  x(PADDING)       \
+  x(J)             \
   x(PADDING)       \
   x(PADDING)       \
   x(PADDING)       \
@@ -43,6 +46,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define MASK0(n, p) (~(MASK1))
 
 #define TWOCOMP(x) ((~(x))+1)
+#define NOR_OP(a, b) (((a) ^ (0xFFFFFFFF)) & ((b) ^ (0xFFFFFFFF)))
 
 /////////////////////////////////////
 // NOTE(Appy): Registers
@@ -60,6 +64,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define SLL     u32t(0x00)
 #define SRL     u32t(0x02)
 #define SRA     u32t(0x03)
+#define JR      u32t(0x8)
 #define ADD     u32t(0x20)
 #define ADDU    u32t(0x21)
 #define SUB     u32t(0x22)
@@ -67,6 +72,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define SUBU    u32t(0x23)
 #define OR      u32t(0x25)
 #define XOR     u32t(0x26)
+#define NOR     u32t(0x27)
 #define DIV     u32t(0x1A)
 #define DIVU    u32t(0x1B)
 #define SYSCALL u32t(0xC)
@@ -158,6 +164,13 @@ HANDLER(SPECIAL)
     case AND:  { RD = RS & RT; break; }  // Bit And
     case SUBU: { RD = RS - RT; break; }  // Subtraction Unsigned
     case XOR:  { RD = RS ^ RT; break; }  // Exclusive Or
+    case NOR:  { RD = NOR_OP(RS,  RT); break; }  // Nor
+    case JR:
+    {
+      // Load jump, horrible hack, starts next one at RS
+      CURRENT_STATE.PC = RS - 4;
+      break;
+    }
     case DIV:  
     {
       s32 denominator = TWOCOMP(RT);
@@ -243,6 +256,12 @@ void process_instruction()
     LBL(XORI): { RT = RS ^ u32t(IMM); NEXT; }    
     LBL(ANDI): { RT = RS & u32t(IMM); NEXT; }
     LBL(LUI):  { RT = (IMM << 16); NEXT; }
+    LBL(J): 
+    {
+      u32 jp = GET_BLOCK(mem, 25, 26);
+      NEXT_STATE.PC = CURRENT_STATE.PC | (jp << 2);
+      NEXT;
+    }
 
     /* Default case. */
     LBL(PADDING):  { NEXT; }
