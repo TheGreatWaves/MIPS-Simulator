@@ -25,7 +25,7 @@ static int jump_pending = -1;
   x(PADDING)       \
   x(PADDING)       \
   x(ANDI)          \
-  x(PADDING)       \
+  x(ORI)           \
   x(XORI)          \
   x(LUI)           \
   x(PADDING)       \
@@ -65,6 +65,8 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define SRL     u32t(0x02)
 #define SRA     u32t(0x03)
 #define JR      u32t(0x8)
+#define MTHI    u32t(0x11)
+#define MTLO    u32t(0x13)
 #define ADD     u32t(0x20)
 #define ADDU    u32t(0x21)
 #define SUB     u32t(0x22)
@@ -171,6 +173,16 @@ HANDLER(SPECIAL)
       CURRENT_STATE.PC = RS - 4;
       break;
     }
+    case MTLO:
+    {
+        CURRENT_STATE.LO = RS;
+        break;
+    }
+    case MTHI:
+    {
+        CURRENT_STATE.HI = RS;
+        break;
+    }
     case DIV:  
     {
       s32 denominator = TWOCOMP(RT);
@@ -255,6 +267,7 @@ void process_instruction()
     }
     LBL(XORI): { RT = RS ^ u32t(IMM); NEXT; }    
     LBL(ANDI): { RT = RS & u32t(IMM); NEXT; }
+    LBL(ORI): { RT = RS | u32t(IMM); NEXT; }
     LBL(LUI):  { RT = (IMM << 16); NEXT; }
     LBL(J): 
     {
