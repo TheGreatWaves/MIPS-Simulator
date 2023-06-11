@@ -42,8 +42,8 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 // NOTE(Appy): Utils
 
 #define MASK(n) (~((~((uint32_t)0)) << n)) // creates a mask of n 1s
-#define MASK1(n, p) (MASK(n)<<(p))
-#define MASK0(n, p) (~(MASK1))
+#define MASK1(n, p) ((MASK(n))<<(p))
+#define MASK0(n, p) (~(MASK1(n, p)))
 
 #define TWOCOMP(x) ((~(x))+1)
 #define NOR_OP(a, b) (((a) ^ (0xFFFFFFFF)) & ((b) ^ (0xFFFFFFFF)))
