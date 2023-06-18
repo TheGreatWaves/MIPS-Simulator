@@ -6,7 +6,6 @@
 #define CAT_HELPER(x, s) CAT(x, s)
 #define PADDING CAT_HELPER(PAD, __COUNTER__)
 
-
 static int jump_pending = -1;
 
 /////////////////////////////////////
