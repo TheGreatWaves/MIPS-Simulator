@@ -37,15 +37,6 @@ static int jump_pending = -1;
 #define ENUMERATE(OP) OP,
 enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 
-/////////////////////////////////////
-// NOTE(Appy): Utils
-
-#define MASK(n) (~((~((uint32_t)0)) << n)) // creates a mask of n 1s
-#define MASK1(n, p) ((MASK(n))<<(p))
-#define MASK0(n, p) (~(MASK1(n, p)))
-
-#define TWOCOMP(x) ((~(x))+1)
-#define NOR_OP(a, b) (((a) ^ (0xFFFFFFFF)) & ((b) ^ (0xFFFFFFFF)))
 
 /////////////////////////////////////
 // NOTE(Appy): Registers
@@ -213,10 +204,7 @@ HANDLER(SPECIAL)
       uint32_t result  = (operand >> sa);
 
       /* Sign extension */
-      if (operand & MASK1(1, 31))
-      {
-         result |= MASK1(sa, 32-sa); 
-      }
+      result = sign_extend(result);
         
       RD = result;
       break;

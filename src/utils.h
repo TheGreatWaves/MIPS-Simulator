@@ -15,6 +15,16 @@
 #define  cast_void(v) cast(void,(v)) 
 #define cast_voidp(v) cast(void*,(v)) 
 
+/////////////////////////////////////
+// NOTE(Appy): Utils
+
+#define MASK(n) (~((~((uint32_t)0)) << n)) // creates a mask of n 1s
+#define MASK1(n, p) ((MASK(n))<<(p))
+#define MASK0(n, p) (~(MASK1(n, p)))
+
+#define TWOCOMP(x) ((~(x))+1)
+#define NOR_OP(a, b) (((a) ^ (0xFFFFFFFF)) & ((b) ^ (0xFFFFFFFF)))
+
 // Primitive types generic printing
 void print_s32   (s32   x) { printf      ("%d\n" , (s32)(x)) ;}
 void print_u32   (u32   x) { printf      ("%u\n" , (u32)(x)) ;}
@@ -27,19 +37,45 @@ void print_char  (char  x) { print_charp (&x)                ;}
 void print_unknown ()      { print_charp ("Unknown type")    ;}
 
 #define gprint(x) _Generic((x), \
-  s8: print_s32,\
-  s16: print_s32,\
-  s32: print_s32,\
-  s64: print_s64,\
-  u8: print_u32, \
-  u16: print_u32, \
-  u32: print_u32, \
-  u64: print_u64, \
-  f32: print_f32, \
-  f64: print_f64, \
-  char*: print_charp, \
-  char: print_char, \
-  default: print_unknown \
+  s8: print_s32,                \
+  s16: print_s32,               \
+  s32: print_s32,               \
+  s64: print_s64,               \
+  u8: print_u32,                \
+  u16: print_u32,               \
+  u32: print_u32,               \
+  u64: print_u64,               \
+  f32: print_f32,               \
+  f64: print_f64,               \
+  char*: print_charp,           \
+  char: print_char,             \
+  default: print_unknown        \
 )(x)
+
+inline u8 count_set_bits(u32 n)
+{
+  u32 total_count = 0;
+  u32 count = 0;
+  while(n)
+  {
+    count += 1;
+    if (n&1)
+    {
+      total_count = count;
+    }
+    n >>= 1;
+  }
+  return count;
+}
+
+inline uint32_t sign_extend(uint32_t n)
+{
+  if ((n >> 31) & 1)
+  {
+    auto sigc = count_set_bits(n);
+    n |= static_cast<uint32_t>(MASK1((32-sigc), sigc));
+  }
+  return n;
+}
 
 #endif // BASE_UTILS
