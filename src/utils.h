@@ -68,14 +68,26 @@ inline u8 count_set_bits(u32 n)
   return count;
 }
 
-inline uint32_t sign_extend(uint32_t n)
+inline uint32_t sign_extend(uint32_t n, uint8_t size, uint32_t value)
 {
-  if ((n >> 31) & 1)
+  if ((n >> (size-1)) & 1)
   {
-    auto sigc = count_set_bits(n);
-    n |= static_cast<uint32_t>(MASK1((32-sigc), sigc));
+    auto sigc = count_set_bits(value);
+    value |= (u32)(MASK1((32-sigc), sigc));
   }
-  return n;
+  return value;
+}
+
+inline uint32_t sign_extend_16(uint32_t n)
+{
+  uint16_t removed = ((n << 17) >> 17);
+  return sign_extend(n, 16, removed);
+}
+
+inline uint32_t sign_extend_32(uint32_t n)
+{
+  uint16_t removed = ((n << 1) >> 1);
+  return sign_extend(n, 32, removed);
 }
 
 #endif // BASE_UTILS

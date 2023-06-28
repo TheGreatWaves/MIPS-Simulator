@@ -14,15 +14,15 @@ static int jump_pending = -1;
   x(SPECIAL)       \
   x(PADDING)       \
   x(J)             \
-  x(PADDING)       \
+  x(JAL)           \
   x(PADDING)       \
   x(PADDING)       \
   x(PADDING)       \
   x(PADDING)       \
   x(ADDIU)         \
   x(ADDI)          \
-  x(PADDING)       \
-  x(PADDING)       \
+  x(SLTI)          \
+  x(SLTIU)         \
   x(ANDI)          \
   x(ORI)           \
   x(XORI)          \
@@ -32,7 +32,33 @@ static int jump_pending = -1;
   x(PADDING)       \
   x(PADDING)       \
   x(PADDING)       \
-  x(PADDING)       
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(SB)            \
+  x(SH)            \
+  x(PADDING)       \
+  x(SW)            \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
+  x(PADDING)       \
 
 #define ENUMERATE(OP) OP,
 enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
@@ -259,12 +285,51 @@ void process_instruction()
     LBL(J): 
     {
       u32 jp = GET_BLOCK(mem, 25, 26);
-      NEXT_STATE.PC = CURRENT_STATE.PC | (jp << 2);
+      NEXT_STATE.PC = (CURRENT_STATE.PC | (jp << 2))-4;
       NEXT;
     }
 
     /* Default case. */
     LBL(PADDING):  { NEXT; }
+    LBL(SB): {
+      uint32_t offset = sign_extend_16(IMM);
+      uint32_t address = offset + RS;
+      uint32_t last_byte = u32t(GET_BLOCK(address, 0, 8));
+      mem_write_32(address, last_byte);
+      NEXT;
+    }
+    LBL(SH): {
+      uint32_t offset = sign_extend_16(IMM);
+      uint32_t address = offset + RS;
+      uint32_t last_byte = u32t(GET_BLOCK(address, 0, 16));
+      mem_write_32(address, last_byte);
+      NEXT;
+    }
+    LBL(SLTI): 
+    {
+      s32 result = RS - cast(s32, sign_extend_16(IMM));
+      RT = (cast(s32, RS) < result) ? 1 : 0;
+      NEXT;
+    }
+    LBL(SLTIU): 
+    {
+      u32 result = RS - sign_extend_16(IMM);
+      RT = (RS < result) ? 1 : 0;
+      NEXT;
+    }
+    LBL(SW):
+    {
+      u32 vAddr = RS + sign_extend_16(IMM);
+      mem_write_32(vAddr, RT);
+      NEXT;
+    }
+    LBL(JAL):
+    {
+      u32 temp = (GET_BLOCK(mem, 0, 25) << 2);
+
+
+      NEXT;
+    }
   }
 
   /* This is place in this way in order to allow disabling of threaded code */
