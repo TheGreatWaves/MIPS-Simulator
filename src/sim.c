@@ -83,6 +83,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define JR      u32t(0x8)
 #define MTHI    u32t(0x11)
 #define MTLO    u32t(0x13)
+#define MULT    u32t(0x18)
 #define ADD     u32t(0x20)
 #define ADDU    u32t(0x21)
 #define SUB     u32t(0x22)
@@ -197,6 +198,13 @@ HANDLER(SPECIAL)
     case MTHI:
     {
         CURRENT_STATE.HI = RS;
+        break;
+    }
+    case MULT:
+    {
+        u64 result = cast(u64, RS) * cast(u64, RT);
+        CURRENT_STATE.HI = (~(cast(u32, 0))) & (result >> 32);
+        CURRENT_STATE.LO = (~(cast(u32, 0))) & result;
         break;
     }
     case DIV:  
@@ -326,8 +334,6 @@ void process_instruction()
     LBL(JAL):
     {
       u32 temp = (GET_BLOCK(mem, 0, 25) << 2);
-
-
       NEXT;
     }
   }
