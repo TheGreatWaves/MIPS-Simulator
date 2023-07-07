@@ -189,15 +189,12 @@ HANDLER(SPECIAL)
     case NOR:  { RD = NOR_OP(RS,  RT); break; }  // Nor
     case JR:
     {
-      
-      // Load jump, horrible hack, starts next one at RS
-      CURRENT_STATE.PC = RS;
+      CURRENT_STATE.PC = RS - 4;
       break;
     }
     case JALR:
     {
-      
-      RD = CURRENT_STATE.PC;
+      RD = CURRENT_STATE.PC + 4;
       CURRENT_STATE.PC = RS - 4;
       break;
     }
