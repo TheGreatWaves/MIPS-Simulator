@@ -306,8 +306,8 @@ void process_instruction()
     LBL(LUI):  {  RT = (IMM << 16); NEXT; }
     LBL(J): 
     {
-      u32 jp = GET_BLOCK(mem, 25, 26);
-      NEXT_STATE.PC = (CURRENT_STATE.PC | (jp << 2))-4;
+      u32 jp = GET_BLOCK(mem, 0, 26);
+      CURRENT_STATE.PC = ((jp << 2)-4);
       NEXT;
     }
 

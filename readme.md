@@ -23,7 +23,6 @@ I-type instructions have a 16 bit immediate field.
 ## R-type instructions
 Main processor instructions which do not require a target address, imm value or branch displacement.
 
-- JALR
 - MFHI
 - MFLO
 - MULT
@@ -35,7 +34,5 @@ Main processor instructions which do not require a target address, imm value or 
 - SRLV
 
 ## Others
-- J
 - BLTZAL
 - BGEZAL
-- JARL
