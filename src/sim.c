@@ -82,6 +82,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define SRL     u32t(0x02)
 #define SRA     u32t(0x03)
 #define JR      u32t(0x8)
+#define JALR    u32t(0b001001)
 #define MTHI    u32t(0x11)
 #define MTLO    u32t(0x13)
 #define MULT    u32t(0x18)
@@ -170,7 +171,7 @@ HANDLER(SPECIAL)
   {
     case SYSCALL:                        // System call
     {     
-      gprint("SYSCALL");
+      
       if (CURRENT_STATE.REGS[R_V0] == 0x0A)
       {
         RUN_BIT = FALSE;
@@ -179,7 +180,7 @@ HANDLER(SPECIAL)
       break;
     }
     case ADDU: 
-    case ADD:  { gprint("ADD"); RD = RS + RT; break; }  // Addition
+    case ADD:  { RD = RS + RT; break; }  // Addition
     case SUB:  { RD = RS - RT; break; }  // Subtraction
     case OR:   { RD = RS | RT; break; }  // Bit Or
     case AND:  { RD = RS & RT; break; }  // Bit And
@@ -188,9 +189,16 @@ HANDLER(SPECIAL)
     case NOR:  { RD = NOR_OP(RS,  RT); break; }  // Nor
     case JR:
     {
-      gprint("JR");
+      
       // Load jump, horrible hack, starts next one at RS
       CURRENT_STATE.PC = RS;
+      break;
+    }
+    case JALR:
+    {
+      
+      RD = CURRENT_STATE.PC;
+      CURRENT_STATE.PC = RS - 4;
       break;
     }
     case MTLO:
@@ -287,15 +295,15 @@ void process_instruction()
     LBL(ADDI):
     LBL(ADDIU):
     {
-      gprint("ADDI");
+      
       uint32_t result = sign_extend_16(u32t(IMM));
       RT = RS + result;
       NEXT;
     }
     LBL(XORI): { RT = RS ^ u32t(IMM); NEXT; }    
     LBL(ANDI): { RT = RS & u32t(IMM); NEXT; }
-    LBL(ORI): { RT = RS | u32t(IMM); NEXT; }
-    LBL(LUI):  { RT = (IMM << 16); NEXT; }
+    LBL(ORI): {  RT = RS | u32t(IMM); NEXT; }
+    LBL(LUI):  {  RT = (IMM << 16); NEXT; }
     LBL(J): 
     {
       u32 jp = GET_BLOCK(mem, 25, 26);

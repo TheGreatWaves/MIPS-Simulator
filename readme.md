@@ -36,7 +36,6 @@ Main processor instructions which do not require a target address, imm value or 
 
 ## Others
 - J
-- JAL
 - BLTZAL
 - BGEZAL
 - JARL
