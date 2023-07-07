@@ -19,8 +19,8 @@ static int jump_pending = -1;
   x(PADDING)       \
   x(PADDING)       \
   x(PADDING)       \
-  x(ADDIU)         \
   x(ADDI)          \
+  x(ADDIU)         \
   x(SLTI)          \
   x(SLTIU)         \
   x(ANDI)          \
@@ -46,7 +46,7 @@ static int jump_pending = -1;
   x(PADDING)       \
   x(PADDING)       \
   x(PADDING)       \
-  x(PADDING)       \
+  x(LW)            \
   x(PADDING)       \
   x(PADDING)       \
   x(PADDING)       \
@@ -68,6 +68,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 // NOTE(Appy): Registers
 
 #define R_V0 2
+#define R_RA 31
 
 /////////////////////////////////////
 // NOTE(Appy): Cast
@@ -169,6 +170,7 @@ HANDLER(SPECIAL)
   {
     case SYSCALL:                        // System call
     {     
+      gprint("SYSCALL");
       if (CURRENT_STATE.REGS[R_V0] == 0x0A)
       {
         RUN_BIT = FALSE;
@@ -177,7 +179,7 @@ HANDLER(SPECIAL)
       break;
     }
     case ADDU: 
-    case ADD:  { RD = RS + RT; break; }  // Addition
+    case ADD:  { gprint("ADD"); RD = RS + RT; break; }  // Addition
     case SUB:  { RD = RS - RT; break; }  // Subtraction
     case OR:   { RD = RS | RT; break; }  // Bit Or
     case AND:  { RD = RS & RT; break; }  // Bit And
@@ -186,8 +188,9 @@ HANDLER(SPECIAL)
     case NOR:  { RD = NOR_OP(RS,  RT); break; }  // Nor
     case JR:
     {
+      gprint("JR");
       // Load jump, horrible hack, starts next one at RS
-      CURRENT_STATE.PC = RS - 4;
+      CURRENT_STATE.PC = RS;
       break;
     }
     case MTLO:
@@ -235,11 +238,15 @@ HANDLER(SPECIAL)
     {
       uint8_t  sa      = SA;
       uint32_t operand = RT;
+      int need_extend  = (operand >> 31) & 1;
       uint32_t result  = (operand >> sa);
 
-      /* Sign extension */
-      result = sign_extend(result);
-        
+      if (need_extend)
+      {
+        /* Sign extension */
+        result = result | MASK1(sa, INSTR_SIZE-sa);
+      }
+
       RD = result;
       break;
     }
@@ -253,6 +260,8 @@ HANDLER(SPECIAL)
 
 void process_instruction()
 {
+  
+  
   /* execute one instruction here. You should use CURRENT_STATE and modify
    * values in NEXT_STATE. You can call mem_read_32() and mem_write_32() to
    * access memory. */
@@ -278,11 +287,8 @@ void process_instruction()
     LBL(ADDI):
     LBL(ADDIU):
     {
-      uint32_t result = u32t(IMM);
-
-      // TODO(Appy): Macro abuse this?
-      /* Bit extend. */
-      if (result & MASK1(1, 15)) { result |= MASK1(16,16); }
+      gprint("ADDI");
+      uint32_t result = sign_extend_16(u32t(IMM));
       RT = RS + result;
       NEXT;
     }
@@ -331,9 +337,18 @@ void process_instruction()
       mem_write_32(vAddr, RT);
       NEXT;
     }
+    LBL(LW):
+    {
+      
+      u32 vAddr = RS + sign_extend_16(IMM);
+      RT = mem_read_32(vAddr);
+      NEXT;
+    }
     LBL(JAL):
     {
       u32 temp = (GET_BLOCK(mem, 0, 25) << 2);
+      NEXT_STATE.REGS[R_RA] = CURRENT_STATE.PC;
+      CURRENT_STATE.PC = temp-4;
       NEXT;
     }
   }

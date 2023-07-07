@@ -44,11 +44,12 @@ def swap(b, a_start, a_size, b_start, b_size):
 
 SPECIAL = 0
 JUMP = 2
+JAL = 3
 res = []
 for line in lines:
     bin_value = f'{line:0>32b}'
     instr = int(bin_value[:6], 2)
-    if instr==SPECIAL or instr==JUMP:
+    if instr==SPECIAL or instr==JUMP or instr==JAL:
         res.append(hex(int(bin_value, 2)))
         continue
     bin_value = swap(bin_value, 6, 5, 11, 5)

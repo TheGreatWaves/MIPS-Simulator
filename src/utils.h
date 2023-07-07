@@ -72,7 +72,7 @@ inline uint32_t sign_extend(uint32_t n, uint8_t size, uint32_t value)
 {
   if ((n >> (size-1)) & 1)
   {
-    auto sigc = count_set_bits(value);
+    u8 sigc = count_set_bits(value);
     value |= (u32)(MASK1((32-sigc), sigc));
   }
   return value;
