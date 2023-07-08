@@ -3,12 +3,6 @@
 ## I-type instructions
 I-type instructions have a 16 bit immediate field.
 
-- BEQ
-- BGEZ
-- BGTZ
-- BLEZ
-- BLTZ
-- BNE
 - LB
 - LBU
 - LH
@@ -33,6 +27,3 @@ Main processor instructions which do not require a target address, imm value or 
 - SRAV
 - SRLV
 
-## Others
-- BLTZAL
-- BGEZAL

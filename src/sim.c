@@ -165,11 +165,10 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 
 HANDLER(REGIMM) {
   u8 op = GET_BLOCK(mem, 16, 5);
-
   switch (op) {
   case BLTZ: {
     u32 addr = CURRENT_STATE.PC + (sign_extend_16(GET(IM, mem)) << 2);
-    int branch = (GET(RS, mem) >> 31);
+    int branch = (CURRENT_STATE.REGS[GET(RS, mem)] >> 31);
     if (branch == 1) {
       CURRENT_STATE.PC = addr - 4;
     }
@@ -177,7 +176,7 @@ HANDLER(REGIMM) {
   }
   case BLTZAL: {
     u32 addr = CURRENT_STATE.PC + (sign_extend_16(GET(IM, mem)) << 2);
-    int branch = (GET(RS, mem) >> 31);
+    int branch = (CURRENT_STATE.REGS[GET(RS, mem)] >> 31);
     NEXT_STATE.REGS[R_RA] = CURRENT_STATE.PC + 4;
     if (branch == 1) {
       CURRENT_STATE.PC = addr - 4;
@@ -186,7 +185,7 @@ HANDLER(REGIMM) {
   }
   case BGEZ: {
     u32 addr = CURRENT_STATE.PC + (sign_extend_16(GET(IM, mem)) << 2);
-    int branch = (GET(RS, mem) >> 31);
+    int branch = (CURRENT_STATE.REGS[GET(RS, mem)] >> 31);
     if (branch == 0) {
       CURRENT_STATE.PC = addr - 4;
     }
@@ -194,7 +193,7 @@ HANDLER(REGIMM) {
   }
   case BGEZAL: {
     u32 addr = CURRENT_STATE.PC + (sign_extend_16(GET(IM, mem)) << 2);
-    int branch = (GET(RS, mem) >> 31);
+    int branch = (CURRENT_STATE.REGS[GET(RS, mem)] >> 31);
     NEXT_STATE.REGS[R_RA] = CURRENT_STATE.PC + 4;
     if (branch == 0) {
       CURRENT_STATE.PC = addr - 4;
@@ -427,7 +426,7 @@ void process_instruction() {
     }
     LBL(JAL) : {
       u32 temp = (GET_BLOCK(mem, 0, 25) << 2);
-      NEXT_STATE.REGS[R_RA] = CURRENT_STATE.PC;
+      NEXT_STATE.REGS[R_RA] = CURRENT_STATE.PC + 4;
       CURRENT_STATE.PC = temp - 4;
       NEXT;
     }
