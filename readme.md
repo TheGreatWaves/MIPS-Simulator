@@ -1,8 +1,3 @@
 # Todo
-
-- SLLV
-- SLT
-- SLTU
-- SRAV
-- SRLV
+Done!
 

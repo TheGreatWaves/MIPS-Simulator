@@ -103,6 +103,11 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define MFHI u32t(0b010000)
 #define MFLO u32t(0b010010)
 #define MULTU u32t(0b011001)
+#define SLLV u32t(0b000100)
+#define SLT u32t(0b101010)
+#define SLTU u32t(0b101011)
+#define SRAV u32t(0b000111)
+#define SRLV u32t(0b000110)
 
 /////////////////////////////////////
 // NOTE(Appy): REGIMM ops
@@ -302,6 +307,42 @@ HANDLER(SPECIAL) {
     u64 result = cast(u64, RS) * cast(u64, RT);
     NEXT_STATE.HI = cast(u32, (result >> 32));
     NEXT_STATE.LO = cast(u32, result);
+    break;
+  }
+  case SLLV:
+  {
+    u8 shift_amount = (RS & MASK(5));
+    RD = (RT << shift_amount);
+    break;
+  }
+  case SLT:
+  {
+    s32 rt = RT;
+    s32 rs = RS;
+    RD = (rs<rt) ? 1 : 0;
+    break;
+  }
+  case SLTU:
+  {
+    u32 rt = RT;
+    u32 rs = RS;
+    RD = (rs<rt) ? 1 : 0;
+    break;
+  }
+  case SRAV:
+  {
+    u8 shift_amount = (RS & MASK(5));
+    u32 rt = RT;
+    u8 sign_bit = ((rt >> 31) & 1);
+    u32 res = (rt >> shift_amount);
+    if (sign_bit==1) res |= (MASK(shift_amount) << (32-shift_amount));
+    RD = res;
+    break;
+  }
+  case SRLV:
+  {
+    u8 shift_amount = (RS & MASK(5));
+    RD = (RT >> shift_amount);
     break;
   }
   case DIV: {
