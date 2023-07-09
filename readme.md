@@ -1,8 +1,5 @@
 # Todo
 
-- MFHI
-- MFLO
-- MULTU
 - SLLV
 - SLT
 - SLTU

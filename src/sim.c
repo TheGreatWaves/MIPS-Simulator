@@ -101,6 +101,8 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define DIVU u32t(0x1B)
 #define SYSCALL u32t(0xC)
 #define MFHI u32t(0b010000)
+#define MFLO u32t(0b010010)
+#define MULTU u32t(0b011001)
 
 /////////////////////////////////////
 // NOTE(Appy): REGIMM ops
@@ -273,21 +275,31 @@ HANDLER(SPECIAL) {
     break;
   }
   case MTLO: {
-    CURRENT_STATE.LO = RS;
+    NEXT_STATE.LO = RS;
     break;
   }
   case MTHI: {
-    CURRENT_STATE.HI = RS;
+    NEXT_STATE.HI = RS;
     break;
   }
   case MULT: {
     u64 result = cast(u64, RS) * cast(u64, RT);
-    CURRENT_STATE.HI = (~(cast(u32, 0))) & (result >> 32);
-    CURRENT_STATE.LO = (~(cast(u32, 0))) & result;
+    NEXT_STATE.HI = (~(cast(u32, 0))) & (result >> 32);
+    NEXT_STATE.LO = (~(cast(u32, 0))) & result;
     break;
   }
   case MFHI: {
     RD = CURRENT_STATE.HI;
+    break;
+  }
+  case MFLO: {
+    RD = CURRENT_STATE.LO;
+    break;
+  }
+  case MULTU: {
+    u64 result = cast(u64, RS) * cast(u64, RT);
+    NEXT_STATE.LO = cast(u32, result & (~((~((uint64_t)0)) << 32)));
+    NEXT_STATE.HI = cast(u32, (result >> 32) & (~((~((uint64_t)0)) << 32)));
     break;
   }
   case DIV: {
