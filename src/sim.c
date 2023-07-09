@@ -311,6 +311,7 @@ HANDLER(SPECIAL) {
   {
     uint8_t sa = SA;
     uint32_t operand = RT;
+
     int need_extend = (operand >> 31) & 1;
     uint32_t result = (operand >> sa);
 
@@ -392,7 +393,8 @@ void process_instruction() {
     LBL(SB) : {
       uint32_t offset = sign_extend_16(IMM);
       uint32_t address = offset + RS;
-      uint32_t last_byte = u32t(GET_BLOCK(address, 0, 8));
+      uint32_t r_rt = CURRENT_STATE.REGS[GET(RT, mem)];
+      uint32_t last_byte = u32t(GET_BLOCK(r_rt, 0, 8));
       mem_write_32(address, last_byte);
       NEXT;
     }
