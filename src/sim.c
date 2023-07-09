@@ -100,6 +100,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define DIV u32t(0x1A)
 #define DIVU u32t(0x1B)
 #define SYSCALL u32t(0xC)
+#define MFHI u32t(0b010000)
 
 /////////////////////////////////////
 // NOTE(Appy): REGIMM ops
@@ -285,9 +286,13 @@ HANDLER(SPECIAL) {
     CURRENT_STATE.LO = (~(cast(u32, 0))) & result;
     break;
   }
+  case MFHI: {
+    RD = CURRENT_STATE.HI;
+    break;
+  }
   case DIV: {
-    s32 denominator = TWOCOMP(RT);
-    s32 numerator = TWOCOMP(RS);
+    s32 numerator   = RS;
+    s32 denominator = RT;
     if (denominator != 0) {
       NEXT_STATE.LO = u32t(numerator / denominator);
       NEXT_STATE.HI = u32t(numerator % denominator);
@@ -295,11 +300,11 @@ HANDLER(SPECIAL) {
     break;
   }
   case DIVU: {
-    u32 denominator = u32t(RT);
-    u32 numerator = u32t(RS);
+    u32 denominator = RT;
+    u32 numerator = RS;
     if (denominator != 0) {
       NEXT_STATE.LO = u32t(numerator / denominator);
-      NEXT_STATE.HI = numerator % denominator;
+      NEXT_STATE.HI = u32t(numerator % denominator);
     }
     break;
   }
