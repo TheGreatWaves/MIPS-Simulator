@@ -6,6 +6,10 @@
 #define CAT_HELPER(x, s) CAT(x, s)
 #define PADDING CAT_HELPER(PAD, __COUNTER__)
 
+#define BYTE 8
+#define WORD 16
+#define DWORD 32
+
 static int jump_pending = -1;
 
 /////////////////////////////////////
@@ -43,12 +47,12 @@ static int jump_pending = -1;
   x(PADDING)      \
   x(PADDING)      \
   x(PADDING)      \
-  x(PADDING)      \
-  x(PADDING)      \
+  x(LB)           \
+  x(LH)           \
   x(PADDING)      \
   x(LW)           \
-  x(PADDING)      \
-  x(PADDING)      \
+  x(LBU)          \
+  x(LHU)          \
   x(PADDING)      \
   x(PADDING)      \
   x(SB)           \
@@ -394,15 +398,21 @@ void process_instruction() {
       uint32_t offset = sign_extend_16(IMM);
       uint32_t address = offset + RS;
       uint32_t r_rt = CURRENT_STATE.REGS[GET(RT, mem)];
-      uint32_t last_byte = u32t(GET_BLOCK(r_rt, 0, 8));
+      uint32_t last_byte = (GET_BLOCK(r_rt, 0, 8));
       mem_write_32(address, last_byte);
       NEXT;
     }
     LBL(SH) : {
       uint32_t offset = sign_extend_16(IMM);
       uint32_t address = offset + RS;
-      uint32_t last_byte = u32t(GET_BLOCK(address, 0, 16));
+      uint32_t r_rt = CURRENT_STATE.REGS[GET(RT, mem)];
+      uint32_t last_byte = (GET_BLOCK(r_rt, 0, 16));
       mem_write_32(address, last_byte);
+      NEXT;
+    }
+    LBL(SW) : {
+      u32 vAddr = RS + sign_extend_16(IMM);
+      mem_write_32(vAddr, RT);
       NEXT;
     }
     LBL(SLTI) : {
@@ -415,9 +425,36 @@ void process_instruction() {
       RT = (RS < result) ? 1 : 0;
       NEXT;
     }
-    LBL(SW) : {
+    LBL(LB) : {
       u32 vAddr = RS + sign_extend_16(IMM);
-      mem_write_32(vAddr, RT);
+      u32 content = mem_read_32(vAddr);
+      u32 byte = GET_BLOCK(content, 0, 8);
+
+      u32 byte_extended = sign_extend_8(byte);
+      RT = byte_extended;
+      NEXT;
+    }
+    LBL(LBU) : {
+      u32 vAddr = RS + sign_extend_16(IMM);
+      u32 content = mem_read_32(vAddr);
+      u32 byte = GET_BLOCK(content, 0, 8);
+      RT = byte;
+      NEXT;
+    }
+    LBL(LH) : {
+      u32 vAddr = RS + sign_extend_16(IMM);
+      u32 content = mem_read_32(vAddr);
+      u32 byte = GET_BLOCK(content, 0, 16);
+
+      u32 byte_extended = sign_extend_16(byte);
+      RT = byte_extended;
+      NEXT;
+    }
+    LBL(LHU) : {
+      u32 vAddr = RS + sign_extend_16(IMM);
+      u32 content = mem_read_32(vAddr);
+      u32 byte = GET_BLOCK(content, 0, 16);
+      RT = byte;
       NEXT;
     }
     LBL(LW) : {
