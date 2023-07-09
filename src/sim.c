@@ -282,12 +282,6 @@ HANDLER(SPECIAL) {
     NEXT_STATE.HI = RS;
     break;
   }
-  case MULT: {
-    u64 result = cast(u64, RS) * cast(u64, RT);
-    NEXT_STATE.HI = (~(cast(u32, 0))) & (result >> 32);
-    NEXT_STATE.LO = (~(cast(u32, 0))) & result;
-    break;
-  }
   case MFHI: {
     RD = CURRENT_STATE.HI;
     break;
@@ -296,10 +290,18 @@ HANDLER(SPECIAL) {
     RD = CURRENT_STATE.LO;
     break;
   }
+  case MULT: {
+    s32 rs     = RS;
+    s32 rt     = RT;
+    s64 result = rs * rt;
+    NEXT_STATE.HI = cast(u32, (result >> 32));
+    NEXT_STATE.LO = cast(u32, result);
+    break;
+  }
   case MULTU: {
     u64 result = cast(u64, RS) * cast(u64, RT);
-    NEXT_STATE.LO = cast(u32, result & (~((~((uint64_t)0)) << 32)));
-    NEXT_STATE.HI = cast(u32, (result >> 32) & (~((~((uint64_t)0)) << 32)));
+    NEXT_STATE.HI = cast(u32, (result >> 32));
+    NEXT_STATE.LO = cast(u32, result);
     break;
   }
   case DIV: {
