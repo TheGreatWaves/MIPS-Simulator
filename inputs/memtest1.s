@@ -1,4 +1,4 @@
-        ; # Basic half word/full word
+        # Basic half word/full word
 	.text
 main:
         #;;  Set a base address
