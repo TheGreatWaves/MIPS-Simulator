@@ -402,7 +402,6 @@ void process_instruction() {
    * access memory. */
   uint32_t mem = mem_read_32(CURRENT_STATE.PC);
   uint8_t instr = GET(OP, mem);
-  printf("at: %x\n", CURRENT_STATE.PC);
 
   /* Instruction jump tables */
   static const void *jumpTable[] = {OPCODES(MK_LBL) MK_LBL(NEXT_STATE)};
@@ -427,7 +426,6 @@ void process_instruction() {
 
     /* Basic cases, none of these messes control flow */
     LBL(ADDI) : LBL(ADDIU) : {
-      gprint("ADDIU");
       uint32_t result = sign_extend_16(u32t(IMM));
       RT = RS + result;
       NEXT;
