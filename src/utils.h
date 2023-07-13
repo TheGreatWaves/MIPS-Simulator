@@ -23,7 +23,7 @@
 #define MASK0(n, p) (~(MASK1(n, p)))
 
 #define TWOCOMP(x) ((~(x))+1)
-#define NOR_OP(a, b) (((a) ^ (0xFFFFFFFF)) & ((b) ^ (0xFFFFFFFF)))
+#define NOR_OP(a, b) (~((a)|(b)))
 
 // Primitive types generic printing
 void print_s32   (s32   x) { printf      ("%d\n" , (s32)(x)) ;}
