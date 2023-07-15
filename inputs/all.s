@@ -5,7 +5,6 @@
 # BLTZAL BGEZAL SLL SRL SRA SLLV
 # SRLV SRAV JALR 
 # SLT SLTU    
-# DIV DIVU 
 
 # This test assumes that all jump and branching instruction works.
 
@@ -228,14 +227,14 @@ test_nor_10:
         bne $t2, $t3, inf
         jal reset
 test_mthi_mfhi:
-        addi $t0, $zero, 0xbeef
+        addi $t0, $zero, 0xbef
         mthi $t0
         mfhi $t2
         bne $t0, $t2, inf
         mthi $zero
         jal reset
 test_mtlo_mflo:
-        addi $t0, $zero, 0xdead
+        addi $t0, $zero, 0xded
         mtlo $t0
         mflo $t2
         bne $t0, $t2, inf
@@ -257,8 +256,11 @@ test_mult_neg:
         mult $t1, $t0
         mfhi $t2
         mflo $t3
-        ori $t1, $zero, -1
-        ori $t4, $t4, -36963
+        addi $t1, $zero, -1
+
+        addi $t4, $zero, 0
+        lui $t4, 0xffff
+        ori $t4, $t4, 0x6f9d
         bne $t2, $t1, inf
         bne $t3, $t4, inf
         jal reset
@@ -268,11 +270,59 @@ test_multu_pos:
         multu $t1, $t0
         mfhi $t2
         mflo $t3
-        ori $t1, $zero, 0x14c # testing hi
+        ori $t1, $zero, 0x14c         # testing hi
         bne $t2, $t1, inf
-        lui $t4, 0xffff       # testing lo
+        lui $t4, 0xffff               # testing lo
         ori $t4, $t4, 0x6f9d
         bne $t3, $t4, inf
+        jal reset
+test_div_pos:
+        ori $t0, $t0, 421
+        ori $t1, $t1, 107
+        div $t0, $t1
+        mfhi $t2
+        mflo $t3
+        addi $t0, $zero, 3
+        ori $t1, $zero, 0x64
+        bne $t3, $t0, inf
+        bne $t2, $t1, inf
+        jal reset
+test_div_neg:
+        addi $t0, $t0, 421
+        addi $t1, $t1, -107
+        div $t0, $t1
+ 
+        mflo $t2
+        addi $t1, $zero, 0
+        lui $t1, 0xffff
+        ori $t1, $t1, 0xfffd
+        bne $t2, $t1, inf
+ 
+        mfhi $t3
+        addi $t0, $zero, 0x64
+        bne $t3, $t0, inf
+        jal reset
+test_divu_pos:
+        ori $t0, $t0, 421
+        ori $t1, $t1, 107
+        divu $t0, $t1
+        mfhi $t2
+        mflo $t3
+        addi $t0, $zero, 3
+        ori $t1, $zero, 0x64
+        bne $t3, $t0, inf
+        bne $t2, $t1, inf
+        jal reset
+test_divu_neg:
+        ori $t0, $t0, 421
+        addi $t1, $t1, -107
+        divu $t0, $t1
+        mfhi $t2
+        mflo $t3
+        addi $t0, $zero, 3
+        bne $t3, $zero, inf
+        ori $t1, $zero, 0x1a5
+        bne $t2, $t1, inf
         jal reset
 done:
         j exit

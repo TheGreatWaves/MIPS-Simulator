@@ -386,16 +386,16 @@ void load_program(char *program_filename) {
   while (fscanf(prog, "%x\n",&word) != EOF) {
     mem_write_32(MEM_TEXT_START + ii, word);
     ii += 4;
-    printf("got:"
-      BYTE_TO_BINARY_PATTERN " " 
-      BYTE_TO_BINARY_PATTERN " " 
-      BYTE_TO_BINARY_PATTERN " " 
-      BYTE_TO_BINARY_PATTERN " : %x\n", 
-      BYTE_TO_BINARY(word>>24), 
-      BYTE_TO_BINARY(word>>16), 
-      BYTE_TO_BINARY(word>>8), 
-      BYTE_TO_BINARY(word),
-      word);
+    // printf("got:"
+    //   BYTE_TO_BINARY_PATTERN " " 
+    //   BYTE_TO_BINARY_PATTERN " " 
+    //   BYTE_TO_BINARY_PATTERN " " 
+    //   BYTE_TO_BINARY_PATTERN " : %x\n", 
+    //   BYTE_TO_BINARY(word>>24), 
+    //   BYTE_TO_BINARY(word>>16), 
+    //   BYTE_TO_BINARY(word>>8), 
+    //   BYTE_TO_BINARY(word),
+    //   word);
   }
 
   CURRENT_STATE.PC = MEM_TEXT_START;
