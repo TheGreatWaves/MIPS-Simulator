@@ -476,8 +476,7 @@ void process_instruction() {
       NEXT;
     }
     LBL(SLTI) : {
-      s32 result = RS - cast(s32, sign_extend_16(IMM));
-      RT = (cast(s32, RS) < result) ? 1 : 0;
+      RT = (cast(s32, RS) < cast(s32, sign_extend_16(IMM))) ? 1 : 0;
       NEXT;
     }
     LBL(SLTIU) : {

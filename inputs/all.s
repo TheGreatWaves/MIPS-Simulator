@@ -1,10 +1,8 @@
 # BLEZ BGTZ
-# SLTI SLTIU ANDI ORI
-# XORI LUI LB LH LW LBU
+# LB LH LW LBU
 # LHU SB SH SW BLTZ BGEZ
-# BLTZAL BGEZAL SLL SRL SRA SLLV
-# SRLV SRAV JALR 
-# SLT SLTU    
+# BLTZAL BGEZAL SRL SRA 
+# JALR 
 
 # This test assumes that all jump and branching instruction works.
 
@@ -150,6 +148,26 @@ test_and_10:
         and $t2, $t0, $t1
         bne $t2, $zero, inf
         jal reset
+test_andi_00:
+        addi $t0, $zero, 0
+        andi $t2, $t0, 0
+        bne $t2, $zero, inf
+        jal reset
+test_andi_01:
+        addi $t0, $zero, 0
+        andi $t2, $t0, 1
+        bne $t2, $zero, inf
+        jal reset
+test_andi_11:
+        addi $t0, $zero, 1
+        andi $t2, $t0, 1
+        beq $t2, $zero, inf
+        jal reset
+test_andi_10:
+        addi $t0, $zero, 1
+        andi $t2, $t0, 0
+        bne $t2, $zero, inf
+        jal reset
 test_or_00:
         addi $t0, $zero, 0
         addi $t1, $zero, 0
@@ -196,6 +214,26 @@ test_xor_10:
         addi $t0, $zero, 1
         addi $t1, $zero, 0
         xor $t2, $t0, $t1
+        beq $t2, $zero, inf
+        jal reset
+test_xori_00:
+        addi $t0, $zero, 0
+        xori $t2, $t0, 0
+        bne $t2, $zero, inf
+        jal reset
+test_xori_01:
+        addi $t0, $zero, 0
+        xori $t2, $t0, 1
+        beq $t2, $zero, inf
+        jal reset
+test_xori_11:
+        addi $t0, $zero, 1
+        xori $t2, $t0, 1
+        bne $t2, $zero, inf
+        jal reset
+test_xori_10:
+        addi $t0, $zero, 1
+        xori $t2, $t0, 0
         beq $t2, $zero, inf
         jal reset
 test_nor_00:
@@ -324,6 +362,92 @@ test_divu_neg:
         ori $t1, $zero, 0x1a5
         bne $t2, $t1, inf
         jal reset
+test_slt0:
+        addi $t0, $zero, -1   # t0 = -1
+        addi $t2, $zero, -1   # t2 = -1
+        slt $t1, $t0, $t2     # t1 = 0 
+        bne $t1, $zero, inf   
+        jal reset
+test_slt1:
+        addi $t0, $zero, -1   # t0 = -1
+        addi $t2, $zero, 1    # t2 = 1
+        slt $t1, $t0, $t2     # t1 = 1 
+        beq $t1, $zero, inf   
+        jal reset
+test_sltu0:
+        addi $t0, $zero, -1   # t0 = -1
+        addi $t2, $zero, 1    # t2 = 1
+        sltu $t1, $t0, $t2    # t1 = 0 
+        bne $t1, $zero, inf
+        jal reset
+test_sltu1:
+        addi $t0, $zero, -1  # t0 = -1
+        addi $t2, $zero, -2  # t2 = 1
+        sltu $t1, $t2, $t1   # t1 = 1
+        bne $t1, $zero, inf   
+        jal reset
+test_slti0:
+        addi $t0, $zero, -1    # t0 = -1
+        slti $t1, $t0, -1      # t1 = 0 
+        bne $t1, $zero, inf   
+        jal reset
+
+        addi $t0, $zero, -1    # t0 = -1
+        slti $t1, $t0, 1       # t1 = 1 
+        beq $t1, $zero, inf    # if t1 == 0, fail
+        jal reset
+test_lui:
+        lui $t0, 0xffff
+        ori $t0, $t0, 0xffff
+        addi $t1, $t1, -1
+        bne $t0, $t1, inf
+        jal reset
+test_sltiu0:
+        addi $t0, $zero, -1    # t0 = -1
+        sltiu $t1, $t0, 1      # t1 = 0 
+        bne $t1, $zero, inf   
+        jal reset
+test_sltiu1:
+        addi $t0, $zero, 1     # t0 = 1
+        sltiu $t1, $t0, -1     # t1 = 0
+        addi $t2, $zero, 1
+        bne $t1, $t2, inf   
+        jal reset
+test_srlv:
+        lui $t3, 0x1fff
+        ori $t3, 0xfff3
+        addi $t0, $zero, -100  # t0 -> -100
+        addi $t1, $zero, 35    # t1 -> 35
+        srlv $t2, $t0, $t1     # t2 -> (-100) >> 3
+        bne $t2, $t3, inf    
+        jal reset
+test_srav:
+        addi $t3,  $zero, -13  # t3 -> -13
+        addi $t0,  $zero, -100 # t0 -> -100
+        addi $t1,  $zero, 35   # t1 -> 35
+        srav $t2,  $t0, $t1    # t2 -> (-100) >> 3
+        bne $t2,  $t3, inf     # Jump to exit if $t2 = -13
+        jal reset
+test_sll:
+        addi $t0, $zero, 1  # t0 = 1
+        addi $t1, $zero, 8  # t1 = 8
+        sll $t2, $t0, 3    # t2 = 8
+        bne $t2, $t1, inf
+        jal reset
+test_sllv:
+        addi $t0,  $zero, 35     # t0
+        addi $t1,  $zero, 1      # t0
+        sllv $t3,  $t1  , $t0    # t3 = 8
+        addi $t3,  $t3  , 2
+        addi $t2,  $zero, 10
+        bne  $t2,  $t3  , inf
+        jal reset
+test_srl:
+        addi $t0, $zero, 32  # t0 = 1
+        srl $t2, $t0, 2    # v0 = 8
+        addi $t1, $zero, 8
+        bne $t1, $t2, inf
+        jal reset
 done:
         j exit
 inf:
@@ -331,7 +455,3 @@ inf:
 exit:
         addiu $v0, $zero, 0xa
         syscall
-
-        
-        
-                        
