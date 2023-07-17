@@ -517,7 +517,6 @@ void process_instruction() {
       NEXT;
     }
     LBL(LW) : {
-
       u32 vAddr = RS + sign_extend_16(IMM);
       RT = mem_read_32(vAddr);
       NEXT;
