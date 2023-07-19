@@ -191,6 +191,7 @@ HANDLER(REGIMM) {
     int branch = (CURRENT_STATE.REGS[GET(RS, mem)] >> 31);
     NEXT_STATE.REGS[R_RA] = CURRENT_STATE.PC + 4;
     if (branch == 1) {
+      gprint("BLTZAL BRANCH TAKEN");
       CURRENT_STATE.PC = addr - 4;
     }
     break;
@@ -205,9 +206,11 @@ HANDLER(REGIMM) {
   }
   case BGEZAL: {
     u32 addr = CURRENT_STATE.PC + (sign_extend_16(GET(IM, mem)) << 2);
+    printf("BGEZAL: $(%x)\n", CURRENT_STATE.REGS[GET(RS, mem)]);
     int branch = (CURRENT_STATE.REGS[GET(RS, mem)] >> 31);
     NEXT_STATE.REGS[R_RA] = CURRENT_STATE.PC + 4;
     if (branch == 0) {
+      gprint("BGEZAL BRANCH TAKEN");
       CURRENT_STATE.PC = addr - 4;
     }
     break;
