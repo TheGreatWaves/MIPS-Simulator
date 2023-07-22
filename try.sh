@@ -7,9 +7,9 @@ opt_name="${inpt_name/.s/"$new_ext"}"
 # hexdump
 
 cd spim_assembler
-python3 ./asm2hex "../inputs/$1"
+python3 ./asm2hex "../tests/$1"
 cd ../src
 make clean && make
-./sim "../inputs/$opt_name"
+./sim "../tests/$opt_name"
 
 

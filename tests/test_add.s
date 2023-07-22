@@ -27,14 +27,16 @@ test_add_pos:
         add $t0, $t0, $t1
         bne $t0, $t1, inf
         jal reset
-# test_add_neg:
-#                                       # test add negative
-#         addi $t2, $t2, -1
-#         add $t0, $t0, $t2
-#         lui $t1, 0xFFFF
-#         ori $t1, $t1, 0xFFFF
-#         bne $t0, $t1, inf
-#         jal reset
+test_add_neg:
+                                      # test add negative
+        addi $t2, $t2, -1
+        add $t0, $t0, $t2
+        lui $t1, 0xFFFF
+        ori $t1, $t1, 0xFFFF
+        bne $t0, $t1, inf
+        jal reset
+done:
+        j exit
 inf:
         addi $t7, $t7, -1
         j exit
