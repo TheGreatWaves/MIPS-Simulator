@@ -1,8 +1,7 @@
-# LB LH LW LBU
-# LHU SB SH SW BLTZ BGEZ
-# BGEZAL  
+# LH
+# LHU  
 
-# This test assumes that all jump and branching instruction works.
+# This test assumes that all jump and branching instruction works. It also assumes that LW works
 
 .text
 
@@ -545,6 +544,469 @@ test_bgezal_no_take:
 test_bgezal_not_taken:
 	jr $ra
 test_bgezal_done:
+	jal reset
+test_sra_neg:
+	addi $t0, $zero, 3
+	addi $t1, $zero, -16
+	sra $t2, $t1, $t0
+	addi $t0, $zero, -2
+	bne $t0, $t2 inf
+	jal reset
+test_sra_neg_1:
+	addi $t0, $zero, 3
+	addi $t1, $zero, -69
+	sra $t2, $t1, $t0
+	addi $t0, $zero, -9
+	bne $t0, $t2 inf
+	jal reset
+test_sra_pos:
+	addi $t0, $zero, 3
+	addi $t1, $zero, 16
+	sra $t2, $t1, $t0
+	addi $t0, $zero, 2
+	bne $t0, $t2 inf
+	jal reset
+test_bltz_take_1:
+	addi $t0, $zero, -1
+	bltz $t0, bltz_take_1
+	j inf
+bltz_take_1:
+	jal reset
+test_bltz_take_2:
+	addi $t0, $zero, -25
+	bltz $t0, bltz_take_2
+	j inf
+bltz_take_2:
+	jal reset
+bltz_no_take_1:
+	bltz $t0, inf
+	jal reset
+bltz_no_take_2:
+	addi $t0, $zero, 256
+	bltz $t0, inf
+	jal reset
+test_bgez_take_1:
+	bgez $t0, bgez_take_1
+	j inf
+bgez_take_1:
+	jal reset
+test_bgez_take_2:
+	addi $t0, $zero, 256
+	bgez $t0, bgez_take_2
+	j inf
+bgez_take_2:
+	jal reset
+test_bgez_no_take_1:
+	addi $t0, $zero, -1
+	bgez $t0, inf
+	jal reset
+test_bgez_no_take_2:
+	addi $t0, $zero, -256
+	bgez $t0, inf
+	jal reset
+test_sw:
+	lui $3, 0x1000
+
+	# Set values
+	addi $t0, $zero, 255
+
+	# Save in memory
+	sw $t0, 0($3)
+
+	# Load data back into $t1
+	lw $t1, 0($3)
+
+	# Should be the same
+	bne $t1, $t0, inf
+	sw $zero, 0($3)
+	jal reset
+test_sw_offset:
+	lui $3, 0x1000
+
+	# Set values
+	addi $t0, $zero, 255
+
+	# Save in memory
+	sw $t0, 4($3)
+
+	# Load data back into $t1
+	lw $t1, 4($3)
+
+	# Should be the same
+	bne $t1, $t0, inf
+	sw $zero, 4($3)
+	jal reset
+test_sw_offset_half:
+	lui $3, 0x1000
+
+	# Set values
+	addi $t0, $zero, -1
+	ori $t2, 0xffff
+
+	# Save in memory
+	sw $t0, 0($3)
+
+	# Load data back into $t1
+	lw $t1, 2($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sw $zero, 0($3)
+	jal reset
+test_sb:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0xabcd
+	ori $t2, $zero, 0xcd
+
+	# Save in memory
+	sb $t0, 0($3)
+
+	# Load data back into $t1
+	lw $t1, 0($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sb $zero, 0($3)
+	jal reset
+test_sb_offset:
+	lui $3, 0x1000
+
+	# Set values
+	addi $t0, $zero, 255
+
+	# Save in memory
+	sb $t0, 4($3)
+
+	# Load data back into $t1
+	lw $t1, 4($3)
+
+	# Should be the same
+	bne $t1, $t0, inf
+	sb $zero, 4($3)
+	jal reset
+test_sb_offset_half:
+	lui $3, 0x1000
+
+	# Set values
+	addi $t0, $zero, -1
+
+	# Save in memory
+	sb $t0, 0($3)
+
+	# Load data back into $t1
+	lw $t1, 2($3)
+
+	# Should be the same
+	bne $t1, $zero, inf
+	sb $zero, 0($3)
+	jal reset
+test_sh:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0xabcd
+	ori $t2, $zero, 0xabcd
+
+	# Save in memory
+	sh $t0, 0($3)
+
+	# Load data back into $t1
+	lw $t1, 0($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sh $zero, 0($3)
+	jal reset
+test_sh_offset:
+	lui $3, 0x1000
+
+	# Set values
+	addi $t0, $zero, 255
+
+	# Save in memory
+	sh $t0, 4($3)
+
+	# Load data back into $t1
+	lw $t1, 4($3)
+
+	# Should be the same
+	bne $t1, $t0, inf
+	sh $zero, 4($3)
+	jal reset
+test_sh_offset_half:
+	lui $3, 0x1000
+
+	# Set values
+	addi $t0, $zero, -1
+
+	# Save in memory
+	sh $t0, 0($3)
+
+	# Load data back into $t1
+	lw $t1, 2($3)
+
+	# Should be the same
+	bne $t1, $zero, inf
+	sh $zero, 0($3)
+	jal reset
+test_sh_offset_fourth:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0xbeef
+	ori $t2, $zero, 0xbe
+
+	# Save in memory
+	sh $t0, 0($3)
+
+	# Load data back into $t1
+	lw $t1, 1($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sh $zero, 0($3)
+	jal reset
+test_lb:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0xabcd
+	lui $t2, 0xffff
+	ori $t2, $t2, 0xffcd
+
+	# Save in memory
+	sw $t0, 0($3)
+
+	# Load data back into $t1
+	lb $t1, 0($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sw $zero, 0($3)
+	jal reset
+test_lb_none:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0xab00
+
+	# Save in memory
+	sw $t0, 0($3)
+
+	# Load data back into $t1
+	lb $t1, 0($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sw $zero, 0($3)
+	jal reset
+test_lb_shift:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0xabcd
+	lui $t2, 0xffff
+	ori $t2, $t2, 0xffab
+
+	# Save in memory
+	sw $t0, 0($3)
+
+	# Load data back into $t1
+	lb $t1, 1($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sw $zero, 0($3)
+	jal reset
+test_lbu:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0xabcd
+	ori $t2, $zero, 0x00cd
+
+	# Save in memory
+	sw $t0, 0($3)
+
+	# Load data back into $t1
+	lbu $t1, 0($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sw $zero, 0($3)
+	jal reset
+test_lbu_none:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0xab00
+
+	# Save in memory
+	sw $t0, 0($3)
+
+	# Load data back into $t1
+	lbu $t1, 0($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sw $zero, 0($3)
+	jal reset
+test_lbu_shift:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0xabcd
+	ori $t2, $zero, 0xab
+
+	# Save in memory
+	sw $t0, 0($3)
+
+	# Load data back into $t1
+	lbu $t1, 1($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sw $zero, 0($3)
+	jal reset
+test_lh:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0xabcd
+	lui $t2, 0xffff
+	ori $t2, $t2, 0xabcd
+
+	# Save in memory
+	sw $t0, 0($3)
+
+	# Load data back into $t1
+	lh $t1, 0($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sw $zero, 0($3)
+	jal reset
+test_lh_extend:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0xab00
+	lui $t2, 0xffff
+	ori $t2, $t2, 0xab00
+
+	# Save in memory
+	sw $t0, 0($3)
+
+	# Load data back into $t1
+	lh $t1, 0($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sw $zero, 0($3)
+	jal reset
+test_lh_no_extend:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0x7b00
+	ori $t2, $zero, 0x7b00
+
+	# Save in memory
+	sw $t0, 0($3)
+
+	# Load data back into $t1
+	lh $t1, 0($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sw $zero, 0($3)
+	jal reset
+test_lh_shift:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0xabcd
+	ori $t2, $t2, 0xab
+
+	# Save in memory
+	sw $t0, 0($3)
+
+	# Load data back into $t1
+	lh $t1, 1($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sw $zero, 0($3)
+	jal reset
+test_lhu:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0xabcd
+	ori $t2, $t2, 0xabcd
+
+	# Save in memory
+	sw $t0, 0($3)
+
+	# Load data back into $t1
+	lhu $t1, 0($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sw $zero, 0($3)
+	jal reset
+test_lhu_extend_ignored:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0xab00
+	ori $t2, $t2, 0xab00
+
+	# Save in memory
+	sw $t0, 0($3)
+
+	# Load data back into $t1
+	lhu $t1, 0($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sw $zero, 0($3)
+	jal reset
+test_lhu_no_extend:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0x7b00
+	ori $t2, $zero, 0x7b00
+
+	# Save in memory
+	sw $t0, 0($3)
+
+	# Load data back into $t1
+	lhu $t1, 0($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sw $zero, 0($3)
+	jal reset
+test_lhu_shift:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0xabcd
+	ori $t2, $t2, 0xab
+
+	# Save in memory
+	sw $t0, 0($3)
+
+	# Load data back into $t1
+	lhu $t1, 1($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sw $zero, 0($3)
 	jal reset
 done:
         j exit
