@@ -482,53 +482,54 @@ int test_file(char* name)
 char* instructions[] = {
   "j",      // 0
   "jal",    // 1
-  "beq",    // 2
-  "bne",    // 3
-  "blez",   // 4
-  "bgtz",   // 5
-  "addi",   // 6
-  "addiu",  // 7
-  "slti",   // 8
-  "sltiu",  // 9
-  "andi",   // 10
-  "ori",    // 11
-  "xori",   // 12
-  "lui",    // 13
-  "lb",     // 14
-  "lh",     // 15
-  "lw",     // 16
-  "lbu",    // 17
-  "lhu",    // 18
-  "sb",     // 19
-  "sh",     // 20
-  "sw",     // 21
-  "bltz",   // 22
-  "bgez",   // 23
-  "bltzal", // 24
-  "bgezal", // 25
-  "sll",    // 26
-  "srl",    // 27
-  "sra",    // 28
-  "sllv",   // 29
-  "srlv",   // 30
-  "srav",   // 31
-  "jr",     // 32
-  "jalr",   // 33
-  "add",    // 34
-  "addu",   // 35
-  "sub",    // 36
-  "subu",   // 37
-  "and",    // 38
-  "or",     // 39
-  "xor",    // 40
-  "nor",    // 41
-  "slt",    // 42
-  "sltu",   // 43
-  "mult",   // 44
-  "mfhi",   // 45
-  "mflo",   // 46
-  "mthi",   // 47
-  "mtlo",   // 48
+  "jr",     // 2
+  "addi",   // 3
+  "mthi",   // 4
+  "mtlo",   // 5
+  "beq",    // 6
+  "bne",    // 7
+  "ori",    // 8
+  "lui",    // 9
+
+  "blez",   // 10
+  "bgtz",   // 11
+  "addiu",  // 12
+  "slti",   // 13
+  "sltiu",  // 14
+  "andi",   // 15
+  "xori",   // 16
+  "lb",     // 17
+  "lh",     // 18
+  "lw",     // 19
+  "lbu",    // 20
+  "lhu",    // 21
+  "sb",     // 22
+  "sh",     // 23
+  "sw",     // 24
+  "bltz",   // 25
+  "bgez",   // 26
+  "bltzal", // 27
+  "bgezal", // 28
+  "sll",    // 29
+  "srl",    // 30
+  "sra",    // 31
+  "sllv",   // 32
+  "srlv",   // 33
+  "srav",   // 34
+  "jalr",   // 35
+  "add",    // 36
+  "addu",   // 37
+  "sub",    // 38
+  "subu",   // 39
+  "and",    // 40
+  "or",     // 41
+  "xor",    // 42
+  "nor",    // 43
+  "slt",    // 44
+  "sltu",   // 45
+  "mult",   // 46
+  "mfhi",   // 47
+  "mflo",   // 48
   "multu",  // 49
   "div",    // 50
   "divu"    // 51
@@ -536,7 +537,7 @@ char* instructions[] = {
 
 int results[52] = {0};
 
-int test_jump()
+int test_j()
 {
   test_file("j");
   uint32_t r8 = CURRENT_STATE.REGS[8]; // $t0
@@ -676,6 +677,34 @@ int test_mtlo()
   }
 }
 
+int test_lui()
+{
+  test_file("lui");
+
+  if (CURRENT_STATE.REGS[8] == 0xffff0000) // Succeeded, jumped over.
+  {
+    return 0;
+  }
+  else
+  {
+    return -1;
+  }
+}
+
+int test_addi()
+{
+  test_file("addi");
+
+  if (CURRENT_STATE.REGS[2] == 0xa) // Succeeded, jumped over.
+  {
+    return 0;
+  }
+  else
+  {
+    return -1;
+  }
+}
+
 void test()
 {
   int full = test_file("all");
@@ -686,25 +715,26 @@ void test()
     printf("|                TEST RESULT                |\n");
     printf("=============================================\n\n");
     printf("=====[ FULL SCORE ]=====\n");
-    // return;
+    return;
   }
   reset();
   int count = 0;
   for (int i=0; i<52; i++)
   {
     int res = 0;
-    // overload some tests (sorry)
+    // overload some tests (sorry), these ones kinda need to work
     switch(i)
     {
-      break; case 0: res = test_jump();
+      break; case 0: res = test_j();
       break; case 1: res = test_jal();
-      break; case 2: res = test_beq();
-      break; case 3: res = test_bne();
-      break; case 11: res = test_ori();
-      break; case 16: res = test_lw();
-      break; case 32: res = test_jr();
-      break; case 47: res = test_mthi();
-      break; case 48: res = test_mtlo();
+      break; case 2: res = test_jr();
+      break; case 3: res = test_addi();
+      break; case 4: res = test_mthi();
+      break; case 5: res = test_mtlo();
+      break; case 6: res = test_beq();
+      break; case 7: res = test_bne();
+      break; case 8: res = test_ori();
+      break; case 9: res = test_lui();
       break; default: res = test_file(instructions[i]);
     }
     count += (res == 0) ? 1 : 0;
@@ -716,6 +746,15 @@ void test()
   printf("|                TEST RESULT                |\n");
   printf("=============================================\n\n");
   fflush(stdout);
+
+  printf("[ NEED TO FIX ]: \n");
+  for (int i=0; i<10; i++)
+  {
+    if (results[i]==-1)
+    {
+      printf("%s\n", instructions[i]);
+    }
+  }
 
   printf("[ Correct ]: %d\n", count);
   printf("[ Incorrect ]: \n");

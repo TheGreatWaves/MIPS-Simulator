@@ -6,8 +6,8 @@
 
 main:   
         j exit                                 # 0x00
-        addiu $t0, $zero, 5                    # 0x04
-        addiu $t1, $zero, 10                   # 0x10
+        addi $t0, $zero, 5                    # 0x04
+        addi $t1, $zero, 10                   # 0x10
 exit:
-        addiu $v0, $zero, 0xa                  # 0x14
+        addi $v0, $zero, 0xa                  # 0x14
         syscall
