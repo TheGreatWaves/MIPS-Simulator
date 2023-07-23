@@ -1,7 +1,6 @@
-# BLEZ BGTZ
 # LB LH LW LBU
 # LHU SB SH SW BLTZ BGEZ
-# BLTZAL BGEZAL SRA 
+# BGEZAL  
 
 # This test assumes that all jump and branching instruction works.
 
@@ -470,12 +469,83 @@ jump_okay:
         jal reset
 test_blez_not_taken:
         addi $t0, $zero, 100
-        blez $t0, blez_b
+        blez $t0, inf
         j blez_done
-blez_b:
-        j inf
 blez_done:
         jal reset
+test_blez_taken_1:
+	blez $t0 blez_take_zero
+	j inf
+blez_take_zero:
+	jal reset
+test_blez_taken_2:
+	addi $t0, $zero, -25
+	blez $t0 blez_take_neg
+	j inf
+blez_take_neg:
+	jal reset
+test_bgtz_not_taken:
+        bgtz $t0, inf
+        jal reset
+test_bgtz_taken_1:
+	addi $t0, $zero, 5
+	bgtz $t0 bgtz_take_5
+	j inf
+bgtz_take_5:
+	jal reset
+test_bgtz_not_taken_2:
+	addi $t0, $zero, -1
+        bgtz $t0, inf
+        jal reset
+test_bltzal_take:
+	addi $t0, $zero, -1
+	add $t1, $zero, $ra       # Record the return address.
+	bltzal $t0, bltzal_take_1 # Should return back here right away.
+	beq $ra, $t1, inf         # Should have changed
+	jal reset
+	j bltzal_take_done_1
+bltzal_take_1:
+	jr $ra
+bltzal_take_done_1:
+test_bltzal_no_take:
+	addi $t0, $zero, 5
+	add $t1, $zero, $ra       # Record the return address.
+	bltzal $t0, test_bltzal_not_taken
+	beq $ra, $t1, inf         # Should not have changed
+	j test_bltzal_done
+test_bltzal_not_taken:
+	jr $ra
+test_bltzal_done:
+	jal reset
+test_bgezal_take_1:
+	add $t1, $zero, $ra       # Record the return address.
+	bgezal $t0, bgezal_take_1 # Should return back here right away.
+	beq $ra, $t1, inf         # Should have changed
+	jal reset
+	j bgezal_take_done_1
+bgezal_take_1:
+	jr $ra
+bgezal_take_done_1:
+test_bgezal_take_2:
+	addi $t1, $zero, 69
+	add $t1, $zero, $ra       # Record the return address.
+	bgezal $t0, bgezal_take_2 # Should return back here right away.
+	beq $ra, $t1, inf         # Should have changed
+	jal reset
+	j bgezal_take_done_2
+bgezal_take_2:
+	jr $ra
+bgezal_take_done_2:
+test_bgezal_no_take:
+	addi $t0, $zero, -4
+	add $t1, $zero, $ra       # Record the return address.
+	bgezal $t0, test_bgezal_not_taken
+	beq $ra, $t1, inf         # Should not have changed
+	j test_bgezal_done
+test_bgezal_not_taken:
+	jr $ra
+test_bgezal_done:
+	jal reset
 done:
         j exit
 inf:
