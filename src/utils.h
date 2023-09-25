@@ -6,14 +6,16 @@
 #include <stdio.h>
 
 //////////////////////////////////
-// NOTE: Useful utilites
+// NOTE: This file contains some general useful utilites.
 
 #define stmnt(s) do { s } while(0)
 
-// Typing casting
+/////////////////////////////////////
+// NOTE(Appy): Type casting
 #define     cast(t,v) ((t)(v))
 #define  cast_void(v) cast(void,(v)) 
 #define cast_voidp(v) cast(void*,(v)) 
+#define u32t(V) (cast(uint32_t, V))
 
 /////////////////////////////////////
 // NOTE(Appy): Utils

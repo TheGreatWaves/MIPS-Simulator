@@ -714,16 +714,6 @@ int test_addi()
 
 void test()
 {
-  int full = test_file("all");
-  go();
-  if (CURRENT_STATE.REGS[14]==0x6c) 
-  {
-    printf("=============================================\n");
-    printf("|                TEST RESULT                |\n");
-    printf("=============================================\n\n");
-    printf("=====[ FULL SCORE ]=====\n");
-    return;
-  }
   reset();
   int count = 0;
   for (int i=0; i<52; i++)

@@ -1,91 +1,6 @@
 #include "shell.h"
-#include "utils.h"
+#include "uninspiring_macros.h"
 #include <stdio.h>
-
-#define CAT(x, s) x##s
-#define CAT_HELPER(x, s) CAT(x, s)
-#define PADDING CAT_HELPER(PAD, __COUNTER__)
-
-#define BYTE 8
-#define WORD 16
-#define DWORD 32
-
-
-/////////////////////////////////////
-// NOTE(Appy): Helper Labels, used for organization.
-#define PIPELINE void
-
-
-/////////////////////////////////////
-// NOTE(Appy): Function prototypes.
-PIPELINE fetch();
-PIPELINE decode();
-PIPELINE execute();
-PIPELINE memory();
-PIPELINE writeback();
-
-static int jump_pending = -1;
-
-/////////////////////////////////////
-// NOTE(Appy): Values used in the pipeline.
-uint32_t mem = 0;
-uint8_t instr = 0;
-
-
-/////////////////////////////////////
-// NOTE(Appy): Opcodes automation
-#define OPCODES(x)\
-  x(SPECIAL)      \
-  x(REGIMM)       \
-  x(J)            \
-  x(JAL)          \
-  x(BEQ)          \
-  x(BNE)          \
-  x(BLEZ)         \
-  x(BGTZ)         \
-  x(ADDI)         \
-  x(ADDIU)        \
-  x(SLTI)         \
-  x(SLTIU)        \
-  x(ANDI)         \
-  x(ORI)          \
-  x(XORI)         \
-  x(LUI)          \
-  x(PADDING)      \
-  x(PADDING)      \
-  x(PADDING)      \
-  x(PADDING)      \
-  x(PADDING)      \
-  x(PADDING)      \
-  x(PADDING)      \
-  x(PADDING)      \
-  x(PADDING)      \
-  x(PADDING)      \
-  x(PADDING)      \
-  x(PADDING)      \
-  x(PADDING)      \
-  x(PADDING)      \
-  x(PADDING)      \
-  x(PADDING)      \
-  x(LB)           \
-  x(LH)           \
-  x(PADDING)      \
-  x(LW)           \
-  x(LBU)          \
-  x(LHU)          \
-  x(PADDING)      \
-  x(PADDING)      \
-  x(SB)           \
-  x(SH)           \
-  x(PADDING)      \
-  x(SW)           \
-  x(PADDING)      \
-  x(PADDING)      \
-  x(PADDING)      \
-  x(PADDING) 
-
-#define ENUMERATE(OP) OP,
-enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 
 /////////////////////////////////////
 // NOTE(Appy): Registers
@@ -94,121 +9,22 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define R_RA 31
 
 /////////////////////////////////////
-// NOTE(Appy): Cast
-
-#define u32t(V) (cast(uint32_t, V))
-
-/////////////////////////////////////
-// NOTE(Appy): R-Type instructions
-
-#define SLL u32t(0x00)
-#define SRL u32t(0x02)
-#define SRA u32t(0x03)
-#define JR u32t(0x8)
-#define JALR u32t(0b001001)
-#define MTHI u32t(0x11)
-#define MTLO u32t(0x13)
-#define MULT u32t(0x18)
-#define ADD u32t(0x20)
-#define ADDU u32t(0x21)
-#define SUB u32t(0x22)
-#define AND u32t(0x24)
-#define SUBU u32t(0x23)
-#define OR u32t(0x25)
-#define XOR u32t(0x26)
-#define NOR u32t(0x27)
-#define DIV u32t(0x1A)
-#define DIVU u32t(0x1B)
-#define SYSCALL u32t(0xC)
-#define MFHI u32t(0b010000)
-#define MFLO u32t(0b010010)
-#define MULTU u32t(0b011001)
-#define SLLV u32t(0b000100)
-#define SLT u32t(0b101010)
-#define SLTU u32t(0b101011)
-#define SRAV u32t(0b000111)
-#define SRLV u32t(0b000110)
-
-/////////////////////////////////////
-// NOTE(Appy): REGIMM ops
-#define BLTZ cast(u8, 0b00000)
-#define BLTZAL cast(u8, 0b10000)
-#define BGEZ cast(u8, 0b00001)
-#define BGEZAL cast(u8, 0b10001)
-
-/////////////////////////////////////
-// NOTE(Appy): Segment sizes
-
-#define INSTR_SIZE 32
-#define OP_SIZE 6
-#define RS_SIZE 5
-#define RT_SIZE 5
-#define RD_SIZE 5
-#define SA_SIZE 5
-#define IM_SIZE 16
-#define CD_SIZE 6
-#define SHAMT_SIZE 5
-
-/////////////////////////////////////
-// NOTE(Appy): Segment positions
-//
-// RS    - Operand A in register file
-// RT    - Operand B in register file
-// RD    - Result destination in register file
-// SHAMT - Shift amount
-// CD    - Function code
-
-#define OP_POS (INSTR_SIZE - OP_SIZE)
-#define RS_POS (OP_POS - RS_SIZE)
-#define RT_POS (RS_POS - RT_SIZE)
-#define RD_POS (RT_POS - RD_SIZE)
-#define SA_POS (RD_POS - SA_SIZE)
-#define IM_POS (RT_POS - IM_SIZE)
-#define CD_POS (0)
-#define SHAMT_POS (6)
-
-/////////////////////////////////////
-// NOTE(Appy): Segment getters
-
-#define GET_BLOCK(addr, start, size) ((addr >> (start)) & MASK(size))
-#define GET(SEG, addr) GET_BLOCK(addr, SEG##_POS, SEG##_SIZE)
-
-/////////////////////////////////////
-// NOTE(Appy): Uninspiring helpers
-
-#define PASS_DOWN(OP) case OP
-#define HANDLE(OP)                                                             \
-  case OP: {                                                                   \
-    instr_##OP(mem);                                                           \
-    break;                                                                     \
-  }
-#define HANDLER(OP) void instr_##OP(uint32_t mem)
-#define CALL_HANDLER(OP) instr_##OP(mem)
-#define FORWARD_HANDLER(OP, TO)                                                \
-  HANDLER(OP) { CALL_HANDLER(TO); }
-#define DISPATCH(code) goto *jumpTable[code];
-#define NEXT goto *jumpTable[u32t(NUMBER_OF_OPS)]
-#define JUMPTABLE static const void *jumpTable[]
-#define MK_LBL(OP) &&lbl_##OP,
-#define LBL(OP) lbl_##OP
-
-/////////////////////////////////////
 // NOTE(Appy): Handlers
 
 HANDLER(REGIMM) {
-  u8 op = GET_BLOCK(mem, 16, 5);
+  u8 op = GET_BLOCK(INSTRUCTION_REGISTER, 16, 5);
   switch (op) {
   case BLTZ: {
-    u32 addr = CURRENT_STATE.PC + (sign_extend_16(GET(IM, mem)) << 2);
-    int branch = (CURRENT_STATE.REGS[GET(RS, mem)] >> 31);
+    u32 addr = CURRENT_STATE.PC + (sign_extend_16(GET(IM, INSTRUCTION_REGISTER)) << 2);
+    int branch = (CURRENT_STATE.REGS[GET(RS, INSTRUCTION_REGISTER)] >> 31);
     if (branch == 1) {
       CURRENT_STATE.PC = addr - 4;
     }
     break;
   }
   case BLTZAL: {
-    u32 addr = CURRENT_STATE.PC + (sign_extend_16(GET(IM, mem)) << 2);
-    int branch = (CURRENT_STATE.REGS[GET(RS, mem)] >> 31);
+    u32 addr = CURRENT_STATE.PC + (sign_extend_16(GET(IM, INSTRUCTION_REGISTER)) << 2);
+    int branch = (CURRENT_STATE.REGS[GET(RS, INSTRUCTION_REGISTER)] >> 31);
     NEXT_STATE.REGS[R_RA] = CURRENT_STATE.PC + 4;
     if (branch == 1) {
       CURRENT_STATE.PC = addr - 4;
@@ -216,16 +32,16 @@ HANDLER(REGIMM) {
     break;
   }
   case BGEZ: {
-    u32 addr = CURRENT_STATE.PC + (sign_extend_16(GET(IM, mem)) << 2);
-    int branch = (CURRENT_STATE.REGS[GET(RS, mem)] >> 31);
+    u32 addr = CURRENT_STATE.PC + (sign_extend_16(GET(IM, INSTRUCTION_REGISTER)) << 2);
+    int branch = (CURRENT_STATE.REGS[GET(RS, INSTRUCTION_REGISTER)] >> 31);
     if (branch == 0) {
       CURRENT_STATE.PC = addr - 4;
     }
     break;
   }
   case BGEZAL: {
-    u32 addr = CURRENT_STATE.PC + (sign_extend_16(GET(IM, mem)) << 2);
-    int branch = (CURRENT_STATE.REGS[GET(RS, mem)] >> 31);
+    u32 addr = CURRENT_STATE.PC + (sign_extend_16(GET(IM, INSTRUCTION_REGISTER)) << 2);
+    int branch = (CURRENT_STATE.REGS[GET(RS, INSTRUCTION_REGISTER)] >> 31);
     NEXT_STATE.REGS[R_RA] = CURRENT_STATE.PC + 4;
     if (branch == 0) {
       CURRENT_STATE.PC = addr - 4;
@@ -238,7 +54,7 @@ HANDLER(REGIMM) {
 }
 
 HANDLER(SPECIAL) {
-  uint8_t code = GET(CD, mem);
+  uint8_t code = GET(CD, INSTRUCTION_REGISTER);
 
 /* Undefine register helpers from process instruction */
 #undef RS
@@ -246,10 +62,10 @@ HANDLER(SPECIAL) {
 #undef IMM
 
 /* Register helpers */
-#define RD (NEXT_STATE.REGS[GET(RD, mem)])
-#define RS (CURRENT_STATE.REGS[GET(RS, mem)])
-#define RT (CURRENT_STATE.REGS[GET(RT, mem)])
-#define SA (GET(SA, mem))
+#define RD (NEXT_STATE.REGS[GET(RD, INSTRUCTION_REGISTER)])
+#define RS (CURRENT_STATE.REGS[GET(RS, INSTRUCTION_REGISTER)])
+#define RT (CURRENT_STATE.REGS[GET(RT, INSTRUCTION_REGISTER)])
+#define SA (GET(SA, INSTRUCTION_REGISTER))
 
   switch (code) {
   case SYSCALL: // System call
@@ -416,18 +232,20 @@ HANDLER(SPECIAL) {
 }
 
 void process_instruction() {
-
-  fetch();
-  decode();
-
   /* Instruction jump tables */
   static const void *jumpTable[] = {OPCODES(MK_LBL) MK_LBL(NEXT_STATE)};
 
+  /* Fetch */
+  uint32_t INSTRUCTION_REGISTER = mem_read_32(CURRENT_STATE.PC);
+
+  /* Retrieve the opcode of the instruction. */
+  uint8_t instr = GET(OP, INSTRUCTION_REGISTER);
+
 /* Helpers */
 #define END_LABEL LBL(NEXT_STATE) :
-#define RS (CURRENT_STATE.REGS[GET(RS, mem)])
-#define RT (NEXT_STATE.REGS[GET(RT, mem)])
-#define IMM (GET(IM, mem))
+#define RS (CURRENT_STATE.REGS[GET(RS, INSTRUCTION_REGISTER)])
+#define RT (NEXT_STATE.REGS[GET(RT, INSTRUCTION_REGISTER)])
+#define IMM (GET(IM, INSTRUCTION_REGISTER))
 
   /* Dispatch the instruction. */
   DISPATCH(instr) {
@@ -464,7 +282,7 @@ void process_instruction() {
       NEXT;
     }
     LBL(J) : {
-      u32 jp = GET_BLOCK(mem, 0, 26);
+      u32 jp = GET_BLOCK(INSTRUCTION_REGISTER, 0, 26);
       CURRENT_STATE.PC = ((jp << 2) - 4);
       NEXT;
     }
@@ -474,7 +292,7 @@ void process_instruction() {
     LBL(SB) : {
       uint32_t offset = sign_extend_16(IMM);
       uint32_t address = offset + RS;
-      uint32_t r_rt = CURRENT_STATE.REGS[GET(RT, mem)];
+      uint32_t r_rt = CURRENT_STATE.REGS[GET(RT, INSTRUCTION_REGISTER)];
       uint32_t last_byte = (GET_BLOCK(r_rt, 0, 8));
       mem_write_32(address, last_byte);
       NEXT;
@@ -482,7 +300,7 @@ void process_instruction() {
     LBL(SH) : {
       uint32_t offset = sign_extend_16(IMM);
       uint32_t address = offset + RS;
-      uint32_t r_rt = CURRENT_STATE.REGS[GET(RT, mem)];
+      uint32_t r_rt = CURRENT_STATE.REGS[GET(RT, INSTRUCTION_REGISTER)];
       uint32_t last_byte = (GET_BLOCK(r_rt, 0, 16));
       mem_write_32(address, last_byte);
       NEXT;
@@ -539,7 +357,7 @@ void process_instruction() {
       NEXT;
     }
     LBL(JAL) : {
-      u32 temp = (GET_BLOCK(mem, 0, 25) << 2);
+      u32 temp = (GET_BLOCK(INSTRUCTION_REGISTER, 0, 25) << 2);
       NEXT_STATE.REGS[R_RA] = CURRENT_STATE.PC + 4;
       CURRENT_STATE.PC = temp - 4;
       NEXT;
@@ -605,40 +423,4 @@ void process_instruction() {
 #ifdef IMM
 #undef IMM
 #endif
-}
-
-// Handle reading the content of the current instructions (based on the PC) and update the PC.
-PIPELINE fetch()
-{
-  mem = mem_read_32(CURRENT_STATE.PC);
-
-  // Update pc. (We always get the next line by default so this can be overrided)
-  NEXT_STATE.PC = CURRENT_STATE.PC + 4;
-}
-
-// Handle the reading operation and send out all the control signals throughout the design.
-PIPELINE decode()
-{
-  // Retrieve the opcode of the instruction.
-  instr = GET(OP, mem);
-}
-
-// Handle the actual operation (within the scope of the ALU) for compute-related instructions 
-// that require results from the ALUs.
-PIPELINE execute()
-{
-  
-}
-
-// Handle all memory related instructions.
-PIPELINE memory()
-{
-  
-}
-
-
-// Handle all the modifications to the register files as well as the PC values.
-PIPELINE writeback()
-{
-  
 }
