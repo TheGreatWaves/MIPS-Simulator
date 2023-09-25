@@ -10,7 +10,27 @@
 #define WORD 16
 #define DWORD 32
 
+
+/////////////////////////////////////
+// NOTE(Appy): Helper Labels, used for organization.
+#define PIPELINE void
+
+
+/////////////////////////////////////
+// NOTE(Appy): Function prototypes.
+PIPELINE fetch();
+PIPELINE decode();
+PIPELINE execute();
+PIPELINE memory();
+PIPELINE writeback();
+
 static int jump_pending = -1;
+
+/////////////////////////////////////
+// NOTE(Appy): Values used in the pipeline.
+uint32_t mem = 0;
+uint8_t instr = 0;
+
 
 /////////////////////////////////////
 // NOTE(Appy): Opcodes automation
@@ -397,11 +417,8 @@ HANDLER(SPECIAL) {
 
 void process_instruction() {
 
-  /* execute one instruction here. You should use CURRENT_STATE and modify
-   * values in NEXT_STATE. You can call mem_read_32() and mem_write_32() to
-   * access memory. */
-  uint32_t mem = mem_read_32(CURRENT_STATE.PC);
-  uint8_t instr = GET(OP, mem);
+  fetch();
+  decode();
 
   /* Instruction jump tables */
   static const void *jumpTable[] = {OPCODES(MK_LBL) MK_LBL(NEXT_STATE)};
@@ -588,4 +605,40 @@ void process_instruction() {
 #ifdef IMM
 #undef IMM
 #endif
+}
+
+// Handle reading the content of the current instructions (based on the PC) and update the PC.
+PIPELINE fetch()
+{
+  mem = mem_read_32(CURRENT_STATE.PC);
+
+  // Update pc. (We always get the next line by default so this can be overrided)
+  NEXT_STATE.PC = CURRENT_STATE.PC + 4;
+}
+
+// Handle the reading operation and send out all the control signals throughout the design.
+PIPELINE decode()
+{
+  // Retrieve the opcode of the instruction.
+  instr = GET(OP, mem);
+}
+
+// Handle the actual operation (within the scope of the ALU) for compute-related instructions 
+// that require results from the ALUs.
+PIPELINE execute()
+{
+  
+}
+
+// Handle all memory related instructions.
+PIPELINE memory()
+{
+  
+}
+
+
+// Handle all the modifications to the register files as well as the PC values.
+PIPELINE writeback()
+{
+  
 }
