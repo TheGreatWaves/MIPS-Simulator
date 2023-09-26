@@ -38,6 +38,9 @@ void print_charp (char* x) { printf      ("%s\n" ,      (x)) ;}
 void print_char  (char  x) { print_charp (&x)                ;}
 void print_unknown ()      { print_charp ("Unknown type")    ;}
 
+#ifndef DEBUG
+#define gprint
+#else
 #define gprint(x) _Generic((x), \
   s8: print_s32,                \
   s16: print_s32,               \
@@ -53,6 +56,7 @@ void print_unknown ()      { print_charp ("Unknown type")    ;}
   char: print_char,             \
   default: print_unknown        \
 )(x)
+#endif
 
 inline u8 count_set_bits(u32 n)
 {
@@ -74,5 +78,16 @@ inline u8 count_set_bits(u32 n)
 
 MAKE_SIGN_EXTEND(16)
 MAKE_SIGN_EXTEND(8)
+
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)  \
+  ((byte) & 0x80 ? '1' : '0'), \
+  ((byte) & 0x40 ? '1' : '0'), \
+  ((byte) & 0x20 ? '1' : '0'), \
+  ((byte) & 0x10 ? '1' : '0'), \
+  ((byte) & 0x08 ? '1' : '0'), \
+  ((byte) & 0x04 ? '1' : '0'), \
+  ((byte) & 0x02 ? '1' : '0'), \
+  ((byte) & 0x01 ? '1' : '0') 
 
 #endif // BASE_UTILS

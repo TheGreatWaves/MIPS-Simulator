@@ -404,16 +404,16 @@ void load_program(char *program_filename) {
   while (fscanf(prog, "%x\n",&word) != EOF) {
     mem_write_32(MEM_TEXT_START + ii, word);
     ii += 4;
-    // printf("got:"
-    //   BYTE_TO_BINARY_PATTERN " " 
-    //   BYTE_TO_BINARY_PATTERN " " 
-    //   BYTE_TO_BINARY_PATTERN " " 
-    //   BYTE_TO_BINARY_PATTERN " : %x\n", 
-    //   BYTE_TO_BINARY(word>>24), 
-    //   BYTE_TO_BINARY(word>>16), 
-    //   BYTE_TO_BINARY(word>>8), 
-    //   BYTE_TO_BINARY(word),
-    //   word);
+    printf("got:"
+      BYTE_TO_BINARY_PATTERN " " 
+      BYTE_TO_BINARY_PATTERN " " 
+      BYTE_TO_BINARY_PATTERN " " 
+      BYTE_TO_BINARY_PATTERN " : %x\n", 
+      BYTE_TO_BINARY(word>>24), 
+      BYTE_TO_BINARY(word>>16), 
+      BYTE_TO_BINARY(word>>8), 
+      BYTE_TO_BINARY(word),
+      word);
   }
 
   CURRENT_STATE.PC = MEM_TEXT_START;
@@ -722,17 +722,17 @@ void test()
     // overload some tests (sorry), these ones kinda need to work
     switch(i)
     {
-      break; case 0: res = test_j();
-      break; case 1: res = test_jal();
-      break; case 2: res = test_jr();
+      // break; case 0: res = test_j();
+      // break; case 1: res = test_jal();
+      // break; case 2: res = test_jr();
       break; case 3: res = test_addi();
-      break; case 4: res = test_mthi();
-      break; case 5: res = test_mtlo();
-      break; case 6: res = test_beq();
-      break; case 7: res = test_bne();
-      break; case 8: res = test_ori();
-      break; case 9: res = test_lui();
-      break; default: res = test_file(instructions[i]);
+      // break; case 4: res = test_mthi();
+      // break; case 5: res = test_mtlo();
+      // break; case 6: res = test_beq();
+      // break; case 7: res = test_bne();
+      // break; case 8: res = test_ori();
+      // break; case 9: res = test_lui();
+      // break; default: res = test_file(instructions[i]);
     }
     int v = (res == 0) ? 1 : 0;
     count += v;

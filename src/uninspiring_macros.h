@@ -173,4 +173,28 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 
 #define PIPELINE
 
+/////////////////////////////////////
+// NOTE(Appy): Control Signal Values
+#define RegDst_rt 0
+#define RegDst_rd 1
+
+#define RegWrite_no 0
+#define RegWrite_yes 1
+
+#define MemRead_no 0
+#define MemRead_yes 1
+
+#define MemWrite_no 0
+#define MemWrite_yes 1
+
+#define MemToReg_ALU_result 0
+#define MemToReg_memory_data 1
+
+#define ALUSrc_rt 0
+#define ALUSrc_immediate 1
+
+#define ALUOp_ADD 0b010
+#define ALUOp_BEQ 0b110
+
+
 #endif /* APPY_SACRILEGIOUS_MACROS */
