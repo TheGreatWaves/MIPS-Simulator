@@ -482,7 +482,9 @@ int test_file(char* name)
   sprintf(path, "../tests/test_%s.x", name);
   initialize(path, 1);
   go();
-  // printf("[%s]: %d\n", name, (CURRENT_STATE.REGS[15] == 0) ? 1 : 0);
+
+
+  
   return (int) CURRENT_STATE.REGS[15];
 }
 
@@ -725,13 +727,14 @@ void test()
       // break; case 0: res = test_j();
       // break; case 1: res = test_jal();
       // break; case 2: res = test_jr();
-      break; case 3: res = test_addi();
+      // break; case 3: res = test_addi();
       // break; case 4: res = test_mthi();
       // break; case 5: res = test_mtlo();
       // break; case 6: res = test_beq();
       // break; case 7: res = test_bne();
       // break; case 8: res = test_ori();
       // break; case 9: res = test_lui();
+      break; case 19: res = test_lw();
       // break; default: res = test_file(instructions[i]);
     }
     int v = (res == 0) ? 1 : 0;
@@ -739,6 +742,7 @@ void test()
     if (v==1) printf("[+]: %s\n", instructions[i]);
     else printf("[-]: %s\n", instructions[i]);
     results[i] = v;
+
     reset();
   }
 

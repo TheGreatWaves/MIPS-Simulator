@@ -69,6 +69,7 @@ PIPE_LINE_REGISTER struct
 {
   u32                     pc;
   u32                     alu_res;
+  u32                     mem_res;
   u8                      rd;     // EX_WriteRegister
   u32                     target;
   MemoryControlSignals    mcs;
@@ -79,7 +80,8 @@ PIPE_LINE_REGISTER struct
 PIPE_LINE_REGISTER struct 
 {
   u32                     memory_read;
-  u32                     alu_rs;
+  u32                     alu_res;
+  u32                     mem_res;
   u8                      rd;
   WriteBackControlSignals wbcs;
 } pr_mem_wb;
@@ -202,13 +204,21 @@ PIPE_LINE_STAGE void decode()
     }
 
 
-    break; case LW:
+    break; case LW: // Load word
     {
       gprint("Decoded: LW\n");
+
+      // We need to read the data (load!)
       enable_memory_r();
 
-      // Show data read from memory.
-      pr_id_ex.wbcs.MemToReg = 1;
+      pr_id_ex.wbcs.RegDst = RegDst_rt;
+      pr_id_ex.wbcs.RegWrite = RegWrite_yes;
+
+      pr_id_ex.ecs.ALUSrc = ALUSrc_immediate;
+      pr_id_ex.ecs.ALUOp = ALUOp_ADD;
+
+      pr_id_ex.wbcs.MemToReg = MemToReg_memory_data;
+
     }
     break; case SW:
     {
@@ -297,7 +307,7 @@ inline void execute_alu()
   switch (pr_id_ex.ecs.ALUOp)
   {
     break; case ALUOp_BEQ:
-    break; case ALUOp_ADD:
+           case ALUOp_ADD: 
     {
       gprint("Execute: ADD\n");
       set_alu_result(operand_a() + operand_b());
@@ -554,8 +564,13 @@ PIPE_LINE_STAGE void memory()
 {
   pr_mem_wb.wbcs = pr_ex_mem.wbcs;
 
-  // Do nothing if there is no memory request.
-  if (pr_ex_mem.mcs.MemRead == 0 && pr_ex_mem.mcs.MemWrite == 0) 
+  if (pr_ex_mem.mcs.MemRead) 
+  {
+    // The ALU computes the (base + offset)
+    pr_ex_mem.mem_res = mem_read_32(pr_ex_mem.alu_res);
+  }
+
+  if (pr_ex_mem.mcs.MemWrite)
   {
     
   }
@@ -564,7 +579,7 @@ PIPE_LINE_STAGE void memory()
   pr_mem_wb.rd = pr_ex_mem.rd;
 
   // EX_ALUResult -> MEM_ALUResult
-  pr_mem_wb.alu_rs = pr_ex_mem.alu_res;
+  pr_mem_wb.alu_res = pr_ex_mem.alu_res;
 
 }
 
@@ -574,11 +589,11 @@ inline u32 write_back_data()
   if (pr_mem_wb.wbcs.MemToReg == MemToReg_memory_data)
   {
     // TODO: return the load data...
-    return 0;
+    return pr_mem_wb.mem_res;
   }
   else
   {
-    return pr_mem_wb.alu_rs;
+    return pr_mem_wb.alu_res;
   }
 }
 
@@ -594,10 +609,6 @@ PIPE_LINE_STAGE void writeback()
     gprint(" ");
     gprint(write_back_data());
     CURRENT_STATE.REGS[pr_mem_wb.rd] = write_back_data();
-  }
-  else
-  {
-    gprint("Writeback RegWrite == false\n");
   }
 
   NEXT_STATE = CURRENT_STATE; 
