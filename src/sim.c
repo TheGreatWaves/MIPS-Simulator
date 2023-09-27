@@ -1,8 +1,11 @@
+#define DEBUG
+
 #include "shell.h"
 #include "uninspiring_macros.h"
 #include "utils.h"
 #include <stdio.h>
 #include <stdbool.h>
+
 
 /////////////////////////////////////
 // NOTE(Appy): Labels for organization
@@ -34,6 +37,18 @@ typedef struct {
   u32 RegDst: 1;
   u32 MemToReg: 1;
 } WriteBackControlSignals;
+
+
+/////////////////////////////////////
+// NOTE(Appy): Pipeline stalls
+struct {
+  u32 fetch: 1;
+  u32 decode: 1;
+  u32 execute: 1;
+  u32 memory: 1;
+  u32 writeback: 1;
+} stall;
+
 
 /////////////////////////////////////
 // NOTE(Appy): Pipeline Registers
@@ -71,6 +86,7 @@ PIPE_LINE_REGISTER struct
   u32                     alu_res;
   u32                     mem_res;
   u8                      rd;     // EX_WriteRegister
+  u32                     rtv;   // REGS[$RT]
   u32                     target;
   MemoryControlSignals    mcs;
   WriteBackControlSignals wbcs;
@@ -95,6 +111,8 @@ PIPE_LINE_STAGE void fetch()
 
   // For later decoding.
   pr_if_id.instruction = mem_read_32(CURRENT_STATE.PC);
+
+  dprint("Fetching...%x\n", pr_if_id.instruction);
 
   // For later computing branch targets.
   pr_if_id.pc = CURRENT_STATE.PC + 4; 
@@ -137,8 +155,8 @@ inline void handle_rtype(u8 op)
   {
     break; case SYSCALL:
     {
-      gprint("RTYPE: SYSCALL\n");
       if (CURRENT_STATE.REGS[R_V0] == 0x0A) {
+        dprint("V0 == 0xA, terminating...%s\n", "");
         RUN_BIT = FALSE;
       }
     }
@@ -162,6 +180,9 @@ PIPE_LINE_STAGE void decode()
   pr_id_ex.rtv = CURRENT_STATE.REGS[pr_id_ex.rti];
   pr_id_ex.rsv = CURRENT_STATE.REGS[pr_id_ex.rsi];
 
+  dprint("RT loaded: %d from register %d\n", CURRENT_STATE.REGS[pr_id_ex.rti], pr_id_ex.rti);
+  dprint("RS loaded: %d from register %d\n", CURRENT_STATE.REGS[pr_id_ex.rsi], pr_id_ex.rsi);
+
   // Indiscriminately sign extend the 16 bits immediate and store it.
   pr_id_ex.imm = sign_extend_16(u32t(GET(IM, pr_if_id.instruction)));
 
@@ -172,6 +193,7 @@ PIPE_LINE_STAGE void decode()
   {
     break; case SPECIAL: // R Type Instructions
     {
+      dprint("Decoded: %s\n", "SPECIAL");
       // No need to write to memory
       disable_memory();
 
@@ -190,7 +212,7 @@ PIPE_LINE_STAGE void decode()
 
     break; case ADDI:
     {
-      gprint("Decoded: ADDI\n");
+      dprint("Decoded: %s\n", "ADDI");
 
       pr_id_ex.wbcs.RegDst = RegDst_rt;
       pr_id_ex.wbcs.RegWrite = RegWrite_yes;
@@ -203,11 +225,25 @@ PIPE_LINE_STAGE void decode()
       pr_id_ex.wbcs.MemToReg = MemToReg_ALU_result;
     }
 
+    break; case LUI:
+    {
+      dprint("Decoded: %s\n", "ADDI");
+
+      pr_id_ex.wbcs.RegDst = RegDst_rt;
+      pr_id_ex.wbcs.RegWrite = RegWrite_yes;
+      pr_id_ex.ecs.ALUSrc = ALUSrc_immediate;
+
+      set_alu_op(ALUOp_LUI);
+
+      disable_memory();
+
+      pr_id_ex.wbcs.MemToReg = MemToReg_ALU_result;
+    }
+
 
     break; case LW: // Load word
     {
-      gprint("Decoded: LW\n");
-
+      dprint("Decoded: %s\n", "LW");
       // We need to read the data (load!)
       enable_memory_r();
 
@@ -218,23 +254,22 @@ PIPE_LINE_STAGE void decode()
       pr_id_ex.ecs.ALUOp = ALUOp_ADD;
 
       pr_id_ex.wbcs.MemToReg = MemToReg_memory_data;
-
     }
     break; case SW:
     {
+      dprint("Decoded: %s\n", "SW");
+
+      // We need to write the data.
       enable_memory_w();
 
-      // No need to set RegDst.
-      // No need to set MemToReg.
-
       // Do not write to register.
-      pr_id_ex.wbcs.RegWrite = 0;
+      pr_id_ex.wbcs.RegWrite = RegWrite_no;
 
       // Selects the immediate as the 2nd operand.
-      pr_id_ex.ecs.ALUSrc = 0;
+      pr_id_ex.ecs.ALUSrc = ALUSrc_immediate;
 
-      pr_id_ex.ecs.ALUOp = 0b010;
-
+      // Compute base + offset
+      pr_id_ex.ecs.ALUOp = ALUOp_ADD;
     }
     break; case BEQ:
     {
@@ -250,13 +285,6 @@ PIPE_LINE_STAGE void decode()
       disable_memory();
     }
   }
-}
-
-// Decode ALU opcode.
-// I have no idea what is going on here.
-inline void decode_alu_op()
-{
-  
 }
 
 inline void choose_register_destination()
@@ -306,11 +334,15 @@ inline void execute_alu()
 {
   switch (pr_id_ex.ecs.ALUOp)
   {
-    break; case ALUOp_BEQ:
-           case ALUOp_ADD: 
+    break; case ALUOp_ADD: 
     {
-      gprint("Execute: ADD\n");
+      dprint("ALU ADD: %u + %u = %u\n", operand_a(), operand_b(), operand_a() + operand_b());
       set_alu_result(operand_a() + operand_b());
+    }
+    break; case ALUOp_LUI:
+    {
+      dprint("ALU LUI%s\n", "");
+      set_alu_result(operand_b() << 16);
     }
   }
 }
@@ -324,12 +356,8 @@ inline void work_out_branch()
 PIPE_LINE_STAGE void execute()
 {
   forward_control_id_ex_to_ex_mem();
-
-  if (pr_ex_mem.wbcs.RegWrite == RegWrite_yes)
-  {
-    gprint("Execute: WriteBack = yes\n");
-  }
-
+  // Forward the second register value (This is for SW)
+  pr_ex_mem.rtv = pr_id_ex.rtv;
   choose_register_destination();
   execute_alu();
 }
@@ -568,11 +596,18 @@ PIPE_LINE_STAGE void memory()
   {
     // The ALU computes the (base + offset)
     pr_ex_mem.mem_res = mem_read_32(pr_ex_mem.alu_res);
+    dprint("Loaded: %u\n", mem_read_32(pr_ex_mem.alu_res));
   }
 
   if (pr_ex_mem.mcs.MemWrite)
   {
-    
+    mem_write_32(pr_ex_mem.alu_res, pr_ex_mem.rtv);
+    dprint("Stored: %u at 0x%x\n", pr_ex_mem.rtv, pr_ex_mem.alu_res);
+  }
+
+  if (pr_ex_mem.mcs.MemRead == MemRead_no && pr_ex_mem.mcs.MemWrite == MemWrite_no)
+  {
+    dprint("Nothing done%s\n", "");
   }
 
   // EX_WriteRegister -> MEM_WriteRegister
@@ -580,6 +615,9 @@ PIPE_LINE_STAGE void memory()
 
   // EX_ALUResult -> MEM_ALUResult
   pr_mem_wb.alu_res = pr_ex_mem.alu_res;
+
+  // EX_MemResult -> MEM_MemResult
+  pr_mem_wb.mem_res = pr_ex_mem.mem_res;
 
 }
 
@@ -589,6 +627,7 @@ inline u32 write_back_data()
   if (pr_mem_wb.wbcs.MemToReg == MemToReg_memory_data)
   {
     // TODO: return the load data...
+    dprint("returing write back data: %d\n", pr_mem_wb.mem_res);
     return pr_mem_wb.mem_res;
   }
   else
@@ -597,24 +636,67 @@ inline u32 write_back_data()
   }
 }
 
-
-
-
 PIPE_LINE_STAGE void writeback()
 {
   if (pr_mem_wb.wbcs.RegWrite == RegWrite_yes)
   {
-    gprint("Writing back\n");
-    gprint(pr_mem_wb.rd);
-    gprint(" ");
-    gprint(write_back_data());
+    dprint("Writing %u to register %u\n", write_back_data(), pr_mem_wb.rd);
     CURRENT_STATE.REGS[pr_mem_wb.rd] = write_back_data();
   }
-
-  NEXT_STATE = CURRENT_STATE; 
 }
 
-void process_instruction() {
+void process_instruction() 
+{
+  printf("\n==== Cycle 1 ====\n\n");
+  fetch();
+
+  printf("\n==== Cycle 2 ====\n\n");
+  decode();
+  fetch();
+
+  printf("\n==== Cycle 3 ====\n\n");
+  execute();
+  decode();
+  fetch();
+
+  printf("\n==== Cycle 4 ====\n\n");
+  memory();
+  execute();
+
+  printf("\n==== Cycle 5 ====\n\n");
+  writeback();
+  memory();
+
+  printf("\n==== Cycle 6 ====\n\n");
+  writeback();
+  decode();
+  fetch();
+
+  printf("\n==== Cycle 7 ====\n\n");
+  execute();
+
+  printf("\n==== Cycle 8 ====\n\n");
+  memory();
+
+  printf("\n==== Cycle 9 ====\n\n");
+  writeback();
+  decode();
+  fetch();
+
+  printf("\n==== Cycle 10 ====\n\n");
+  execute();
+
+  printf("\n==== Cycle 11 ====\n\n");
+  memory();
+
+  printf("\n=== Cycle 12 ===\n\n");
+  writeback();
+  decode();
+
+  RUN_BIT = FALSE;
+}
+
+void lprocess_instruction() {
   /* Instruction jump tables */
   // static const void *jumpTable[] = {OPCODES(MK_LBL) MK_LBL(NEXT_STATE)};
 

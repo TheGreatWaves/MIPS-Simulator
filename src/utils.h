@@ -5,6 +5,18 @@
 #include "types.h"
 #include <stdio.h>
 
+
+//////////////////////////////////
+// NOTE: Debug print
+
+#ifndef DEBUG
+#define dprint
+#else
+#define dprint(fmt, ...) \
+        do { fprintf(stderr, "%s:%d:%s(): " fmt, __FILE__, \
+                                __LINE__, __func__, __VA_ARGS__); } while (0)
+#endif
+
 //////////////////////////////////
 // NOTE: This file contains some general useful utilites.
 

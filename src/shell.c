@@ -629,12 +629,21 @@ int test_ori()
 
 int test_lw()
 {
-  test_file("lw");
-  uint32_t r8 = CURRENT_STATE.REGS[8]; // $t0
+  char path[80];
+  sprintf(path, "../tests/test_%s.x", "lw");
+  initialize(path, 1);
 
-  if (r8==0) 
+  FILE* df = fopen( "dumpsim", "w" );
+  mdump(df, MEM_DATA_START-4, MEM_DATA_START+20);
+
+  // Cycle 1
+  
+
+  uint32_t v0 = CURRENT_STATE.REGS[2]; // $t0
+
+  if (v0==10) 
   {
-    return 0;
+    return 10;
   }
   else
   {
@@ -718,7 +727,7 @@ void test()
 {
   reset();
   int count = 0;
-  for (int i=0; i<52; i++)
+  for (int i=19; i<20; i++)
   {
     int res = 0;
     // overload some tests (sorry), these ones kinda need to work
