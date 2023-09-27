@@ -3,7 +3,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#define PRINT_HISTORY
+MAKE_SIGN_EXTEND(16)
+MAKE_SIGN_EXTEND(8)
 
 char pipeline_history[HISTORY_BUFFER_SIZE];
 u32 fetch_count     = 0;
@@ -42,7 +43,7 @@ typedef struct {
   u32 RegWrite: 1;
   u32 RegDst: 1;
   u32 MemToReg: 1;
-  u32 Branch:    1; 
+  u32 PCSrc:    2; 
 } WriteBackControlSignals;
 
 
@@ -126,6 +127,7 @@ PIPE_LINE_REGISTER struct {
   /* Data */
   u32 pc;   // Program counter
   u32 imm;  // Sign extended immediate
+  u32 ja;   // Jump address
 
   /* Register index */
   u8  rsi;  
@@ -144,7 +146,6 @@ PIPE_LINE_REGISTER struct {
 
 PIPE_LINE_REGISTER struct 
 {
-  u32                     pc;
   u32                     alu_res;
   u32                     mem_res;
   u32                     target;
@@ -175,10 +176,11 @@ PIPE_LINE_STAGE void fetch()
   // For later decoding.
   pr_if_id.instruction = mem_read_32(CURRENT_STATE.PC);
 
-  dprint("Fetching...%x\n", pr_if_id.instruction);
 
   // For later computing branch targets.
   pr_if_id.pc = CURRENT_STATE.PC; 
+
+  dprint("Fetching...address: 0x%x, got: 0x%x\n", pr_if_id.pc, pr_if_id.instruction);
 
   CURRENT_STATE.PC += 4;
 }
@@ -297,18 +299,19 @@ inline void reset_control_signals()
   pr_id_ex.mcs.MemRead = 0;
   pr_id_ex.mcs.MemWrite = 0;
 
-  pr_id_ex.wbcs.Branch = 0;
+  pr_id_ex.wbcs.PCSrc = 0;
   pr_id_ex.wbcs.RegDst = 0;
   pr_id_ex.wbcs.RegWrite = 0;
   pr_id_ex.wbcs.MemToReg = 0;
 }
 
-PIPE_LINE_STAGE void decode()
+// Read registers and sign extend the immediate and store them.
+inline void retrieve_values()
 {
-  reset_control_signals();
-
   // Forward the PC
   pr_id_ex.pc = pr_if_id.pc;
+
+  dprint("forwarded pc: 0x%x\n", pr_id_ex.pc);
 
   // Store register numbers
   pr_id_ex.rsi = GET(RS, pr_if_id.instruction);
@@ -327,6 +330,23 @@ PIPE_LINE_STAGE void decode()
   // Indiscriminately sign extend the 16 bits immediate and store it.
   pr_id_ex.imm = sign_extend_16(u32t(GET(IM, pr_if_id.instruction)));
 
+  u32 jump_offset = GET_BLOCK(pr_id_ex.imm, 0, 26);
+  pr_id_ex.ja = (jump_offset << 2);
+}
+
+PIPE_LINE_STAGE void decode()
+{
+  // Reset control signals, so we only have to worry about setting true values.
+  reset_control_signals();
+
+  // Retrieve:
+  // - PC
+  // - Reg indicies
+  // - Rt, Rs val
+  // This is independent from instruction type.
+  retrieve_values();
+
+
   // Set control signals
   enum EOPCODES instr = cast(enum EOPCODES, GET(OP, pr_if_id.instruction));
 
@@ -343,21 +363,33 @@ PIPE_LINE_STAGE void decode()
         // No need to write to memory
         disable_memory();
 
-        pr_id_ex.wbcs.MemToReg = 0; // Select from ALU result to be written back.
-        pr_id_ex.wbcs.RegWrite = 1; // We need to write to the register.
-
         // Execute
-        pr_id_ex.ecs.ALUSrc    = 1; // 2nd ALU operands comes from the Register File.
-        pr_id_ex.wbcs.RegDst   = RegDst_rd; // Destination register is $rd.
+        pr_id_ex.ecs.ALUSrc    = ALUSrc_rt;
+
+        // Writeback
+        pr_id_ex.wbcs.MemToReg = MemToReg_ALU_result;         
+        pr_id_ex.wbcs.RegWrite = RegWrite_yes;        // We need to write to the register.
+        pr_id_ex.wbcs.RegDst   = RegDst_rd;           // Destination register is $rd.
       }
 
       handle_rtype(code);
     }
 
+    break; case J:
+    {
+      dprint("Decoded: %s\n", "J");
+
+      pr_id_ex.wbcs.PCSrc = PCSrc_jump; 
+
+      // Stall fetch and decode.
+      status.fetch = STATUS_STALL;
+      status.decode = STATUS_STALL;
+    }
+
     break; case BEQ:
     {
       dprint("Decoded: %s\n", "BEQ");
-      pr_id_ex.wbcs.Branch = Branch_yes;
+      pr_id_ex.wbcs.PCSrc = PCSrc_branch;
       pr_id_ex.wbcs.RegWrite = RegWrite_no;
       pr_id_ex.ecs.ALUSrc = ALUSrc_rt;
       pr_id_ex.ecs.ALUOp = ALUOp_SUB;
@@ -449,9 +481,22 @@ inline void choose_register_destination()
                   : pr_id_ex.rdi;
 }
 
-inline void calculate_branch_target()
+inline void calculate_pc_target()
 {
-  pr_ex_mem.target = pr_id_ex.pc + (pr_id_ex.imm * 4);
+  switch (pr_ex_mem.wbcs.PCSrc) 
+  {
+    break; case PCSrc_branch:
+    {
+      pr_ex_mem.target = pr_id_ex.pc + (pr_id_ex.imm * 4);
+    }
+    break; case PCSrc_jump:
+    {
+      dprint("PC: 0x%x\n", pr_id_ex.pc);
+      pr_ex_mem.target = (pr_id_ex.pc & 0xFFFF0000) | pr_id_ex.ja;
+    }
+  }
+
+  // Default case is PC + 4.
 }
 
 inline void forward_control_id_ex_to_ex_mem()
@@ -502,22 +547,18 @@ inline void execute_alu()
       set_alu_result(operand_a() - operand_b());
     }
   }
-}
 
-// Decide whether jump/branch should be taken
-inline void work_out_branch()
-{
-  
 }
 
 PIPE_LINE_STAGE void execute()
 {
   forward_control_id_ex_to_ex_mem();
-  calculate_branch_target();
+  calculate_pc_target();
   // Forward the second register value (This is for SW)
   pr_ex_mem.rtv = pr_id_ex.rtv;
   choose_register_destination();
   execute_alu();
+  pr_id_ex.ecs.ALUOp = ALUOp_NOOP;
 }
 
 /////////////////////////////////////
@@ -816,12 +857,14 @@ PIPE_LINE_STAGE void writeback()
     set_register_ready();
   }
 
-  if (pr_mem_wb.wbcs.Branch == Branch_yes)
+  if (pr_mem_wb.wbcs.PCSrc != PCSrc_normal)
   {
-    if (pr_mem_wb.alu_res == 0)
+    // We got jump/branch.
+
+    if (pr_mem_wb.wbcs.PCSrc == PCSrc_jump || pr_mem_wb.alu_res == 0)
     {
       // This is a branching instruction and we have to take it.
-      dprint("Branch taken%s!\n", "");
+      dprint("Branch taken, now at 0x%x!\n", pr_mem_wb.target);
       CURRENT_STATE.PC = pr_mem_wb.target;
     }
     else

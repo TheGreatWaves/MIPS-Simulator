@@ -9,7 +9,6 @@ main:
         addiu $t0, $zero, 0                    
         addiu $t1, $zero, 0                    
 next:
-        addiu $t0, $zero, 0                    
 	beq $t0, $zero, next_next  # not taken
 exit:
         addiu $v0, $zero, 0xa

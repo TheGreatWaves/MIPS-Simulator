@@ -1,6 +1,4 @@
-J 
 JAL 
-BEQ 
 BNE 
 BLEZ 
 BGTZ

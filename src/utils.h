@@ -88,10 +88,8 @@ inline u8 count_set_bits(u32 n)
   return count;
 }
 
-#define MAKE_SIGN_EXTEND(sz) static u32 sign_extend_##sz(uint32_t n) { if ((n >> (sz - 1)) & 1) { n = n | MASK1((32 - sz), sz); } return n; }
+#define MAKE_SIGN_EXTEND(sz) u32 sign_extend_##sz(uint32_t n) { if ((n >> (sz - 1)) & 1) { n = n | MASK1((32 - sz), sz); } return n; }
 
-MAKE_SIGN_EXTEND(16)
-MAKE_SIGN_EXTEND(8)
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \
