@@ -160,7 +160,7 @@ void cycle() {
 
   INSTRUCTION_COUNT++;
 
-  if (INSTRUCTION_COUNT >= 30)
+  if (INSTRUCTION_COUNT >= 50)
   {
     CURRENT_STATE.REGS[15] = 0xffffffff;
     RUN_BIT = FALSE;

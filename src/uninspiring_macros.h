@@ -193,6 +193,9 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define ALUSrc_rt 0
 #define ALUSrc_immediate 1
 
+#define Branch_yes 1
+#define Branch_no 0
+
 #define ALUOp_ADD 1
 #define ALUOp_SUB 2
 #define ALUOp_LUI 3

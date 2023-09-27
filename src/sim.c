@@ -36,13 +36,13 @@ typedef struct {
 typedef struct {
   u32 MemRead:  1;
   u32 MemWrite: 1;
-  u32 PCSrc:    1;
 } MemoryControlSignals;
 
 typedef struct {
   u32 RegWrite: 1;
   u32 RegDst: 1;
   u32 MemToReg: 1;
+  u32 Branch:    1; 
 } WriteBackControlSignals;
 
 
@@ -147,9 +147,9 @@ PIPE_LINE_REGISTER struct
   u32                     pc;
   u32                     alu_res;
   u32                     mem_res;
+  u32                     target;
   u8                      rd;       // EX_WriteRegister
   u32                     rtv;      // REGS[$RT]
-  u32                     target;
   MemoryControlSignals    mcs;
   WriteBackControlSignals wbcs;
   bool                    branch;
@@ -160,6 +160,7 @@ PIPE_LINE_REGISTER struct
   u32                     memory_read;
   u32                     alu_res;
   u32                     mem_res;
+  u32                     target;
   u8                      rd;
   WriteBackControlSignals wbcs;
 } pr_mem_wb;
@@ -177,7 +178,7 @@ PIPE_LINE_STAGE void fetch()
   dprint("Fetching...%x\n", pr_if_id.instruction);
 
   // For later computing branch targets.
-  pr_if_id.pc = CURRENT_STATE.PC + 4; 
+  pr_if_id.pc = CURRENT_STATE.PC; 
 
   CURRENT_STATE.PC += 4;
 }
@@ -288,8 +289,24 @@ inline void set_register_dependency()
   }
 }
 
+inline void reset_control_signals()
+{
+  pr_id_ex.ecs.ALUOp = 0;
+  pr_id_ex.ecs.ALUSrc = 0;
+
+  pr_id_ex.mcs.MemRead = 0;
+  pr_id_ex.mcs.MemWrite = 0;
+
+  pr_id_ex.wbcs.Branch = 0;
+  pr_id_ex.wbcs.RegDst = 0;
+  pr_id_ex.wbcs.RegWrite = 0;
+  pr_id_ex.wbcs.MemToReg = 0;
+}
+
 PIPE_LINE_STAGE void decode()
 {
+  reset_control_signals();
+
   // Forward the PC
   pr_id_ex.pc = pr_if_id.pc;
 
@@ -337,6 +354,23 @@ PIPE_LINE_STAGE void decode()
       handle_rtype(code);
     }
 
+    break; case BEQ:
+    {
+      dprint("Decoded: %s\n", "BEQ");
+      pr_id_ex.wbcs.Branch = Branch_yes;
+      pr_id_ex.wbcs.RegWrite = RegWrite_no;
+      pr_id_ex.ecs.ALUSrc = ALUSrc_rt;
+      pr_id_ex.ecs.ALUOp = ALUOp_SUB;
+
+      disable_memory();
+
+      // Stall fetch we have to wait now.
+      status.fetch = STATUS_STALL;
+
+      // We won't be decoding as well, so we stall.
+      status.decode = STATUS_STALL;
+    }
+
     break; case ADDIU:
            case ADDI:
     {
@@ -351,6 +385,7 @@ PIPE_LINE_STAGE void decode()
       disable_memory();
 
       pr_id_ex.wbcs.MemToReg = MemToReg_ALU_result;
+
     }
 
     break; case LUI:
@@ -399,19 +434,6 @@ PIPE_LINE_STAGE void decode()
       // Compute base + offset
       pr_id_ex.ecs.ALUOp = ALUOp_ADD;
     }
-    break; case BEQ:
-    {
-      // Do not write to register.
-      pr_id_ex.wbcs.RegWrite = 0;
-
-      // Selects the immediate as the 2nd operand.
-      pr_id_ex.ecs.ALUSrc = 1;
-
-      pr_id_ex.ecs.ALUOp = 0b110;
-
-      // No memory operation
-      disable_memory();
-    }
   }
 
   set_register_dependency();
@@ -429,7 +451,7 @@ inline void choose_register_destination()
 
 inline void calculate_branch_target()
 {
-  pr_ex_mem.target = pr_id_ex.pc + pr_id_ex.imm;
+  pr_ex_mem.target = pr_id_ex.pc + (pr_id_ex.imm * 4);
 }
 
 inline void forward_control_id_ex_to_ex_mem()
@@ -474,6 +496,11 @@ inline void execute_alu()
       dprint("ALU LUI%s\n", "");
       set_alu_result(operand_b() << 16);
     }
+    break; case ALUOp_SUB:
+    {
+      dprint("ALU SUB: %u - %u = %u\n", operand_a(), operand_b(), operand_a() - operand_b());
+      set_alu_result(operand_a() - operand_b());
+    }
   }
 }
 
@@ -486,6 +513,7 @@ inline void work_out_branch()
 PIPE_LINE_STAGE void execute()
 {
   forward_control_id_ex_to_ex_mem();
+  calculate_branch_target();
   // Forward the second register value (This is for SW)
   pr_ex_mem.rtv = pr_id_ex.rtv;
   choose_register_destination();
@@ -720,6 +748,7 @@ HANDLER(SPECIAL) {
 
 PIPE_LINE_STAGE void memory()
 {
+  pr_mem_wb.target = pr_ex_mem.target;
   pr_mem_wb.wbcs = pr_ex_mem.wbcs;
 
   if (pr_ex_mem.mcs.MemRead) 
@@ -786,9 +815,27 @@ PIPE_LINE_STAGE void writeback()
 
     set_register_ready();
   }
+
+  if (pr_mem_wb.wbcs.Branch == Branch_yes)
+  {
+    if (pr_mem_wb.alu_res == 0)
+    {
+      // This is a branching instruction and we have to take it.
+      dprint("Branch taken%s!\n", "");
+      CURRENT_STATE.PC = pr_mem_wb.target;
+    }
+    else
+    {
+      dprint("Branch not taken%s!\n", "");
+    }
+
+    // We can safely resume fetch now.
+    status.fetch = STATUS_READY;
+  }
 }
 
-#define log_history(stage, ch) pipeline_history[HISTORY_LINE_LENGTH * stage##_count + cycle_number] =  (status.stage == STATUS_READY) ? ch : '-'
+#define log_history(stage, ch) \
+pipeline_history[HISTORY_LINE_LENGTH * stage##_count + cycle_number] = (status.stage == STATUS_READY) ? ch : '-'
 
 void process_instruction() 
 {
@@ -843,6 +890,7 @@ void process_instruction()
       decode_count++;
       status.fetch = STATUS_READY;
       decode();
+      status.decode = STATUS_STALL;
     }
   }
 
