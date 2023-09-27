@@ -18,6 +18,7 @@
 #define _SIM_SHELL_H_
 
 #include <stdint.h>
+#include "utils.h"
 
 #define FALSE 0
 #define TRUE  1

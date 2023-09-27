@@ -151,9 +151,12 @@ void help() {
 /*                                                             */
 /***************************************************************/
 void cycle() {                                                
+#ifdef DEBUG
+  printf("\n=== Cycle %u ===\n", INSTRUCTION_COUNT);
+#endif
 
   process_instruction();
-  CURRENT_STATE = NEXT_STATE;
+
   INSTRUCTION_COUNT++;
 
   if (INSTRUCTION_COUNT >= 1000)

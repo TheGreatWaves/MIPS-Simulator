@@ -1,11 +1,7 @@
-#define DEBUG
-
 #include "shell.h"
 #include "uninspiring_macros.h"
-#include "utils.h"
 #include <stdio.h>
 #include <stdbool.h>
-
 
 /////////////////////////////////////
 // NOTE(Appy): Labels for organization
@@ -41,14 +37,31 @@ typedef struct {
 
 /////////////////////////////////////
 // NOTE(Appy): Pipeline stalls
-struct {
-  u32 fetch: 1;
-  u32 decode: 1;
-  u32 execute: 1;
-  u32 memory: 1;
-  u32 writeback: 1;
-} stall;
 
+typedef struct {
+  u32 fetch:     1; 
+  u32 decode:    1;
+  u32 execute:   1;
+  u32 memory:    1;
+  u32 writeback: 1;
+} Stall;
+
+#define STALL 1
+#define READY 0
+
+Stall stall = {
+  .fetch     = READY, // We kickstart fetching right away.
+  .decode    = STALL,
+  .execute   = STALL,
+  .memory    = STALL,
+  .writeback = STALL,  
+};
+
+/////////////////////////////////////
+// NOTE(Appy): Dependency detection
+
+// All of the registers starts off being ready.
+bool REG_READY[MIPS_REGS] = { true }; 
 
 /////////////////////////////////////
 // NOTE(Appy): Pipeline Registers
@@ -85,8 +98,8 @@ PIPE_LINE_REGISTER struct
   u32                     pc;
   u32                     alu_res;
   u32                     mem_res;
-  u8                      rd;     // EX_WriteRegister
-  u32                     rtv;   // REGS[$RT]
+  u8                      rd;       // EX_WriteRegister
+  u32                     rtv;      // REGS[$RT]
   u32                     target;
   MemoryControlSignals    mcs;
   WriteBackControlSignals wbcs;
@@ -647,53 +660,41 @@ PIPE_LINE_STAGE void writeback()
 
 void process_instruction() 
 {
-  printf("\n==== Cycle 1 ====\n\n");
-  fetch();
+  if (stall.writeback == READY)
+  {
+    stall.writeback  = STALL;
+    writeback();
+    stall.fetch = READY;
+  }
 
-  printf("\n==== Cycle 2 ====\n\n");
-  decode();
-  fetch();
+  if (stall.memory == READY)
+  {
+    stall.memory  = STALL;
+    memory();
+    stall.writeback = READY;
+  }
 
-  printf("\n==== Cycle 3 ====\n\n");
-  execute();
-  decode();
-  fetch();
+  if (stall.execute == READY)
+  {
+    stall.execute   = STALL;
+    execute();
+    stall.memory = READY;
+  }
 
-  printf("\n==== Cycle 4 ====\n\n");
-  memory();
-  execute();
+  if (stall.decode == READY)
+  {
+    stall.decode = STALL;
+    decode();
+    stall.execute = READY;
+  }
 
-  printf("\n==== Cycle 5 ====\n\n");
-  writeback();
-  memory();
-
-  printf("\n==== Cycle 6 ====\n\n");
-  writeback();
-  decode();
-  fetch();
-
-  printf("\n==== Cycle 7 ====\n\n");
-  execute();
-
-  printf("\n==== Cycle 8 ====\n\n");
-  memory();
-
-  printf("\n==== Cycle 9 ====\n\n");
-  writeback();
-  decode();
-  fetch();
-
-  printf("\n==== Cycle 10 ====\n\n");
-  execute();
-
-  printf("\n==== Cycle 11 ====\n\n");
-  memory();
-
-  printf("\n=== Cycle 12 ===\n\n");
-  writeback();
-  decode();
-
-  RUN_BIT = FALSE;
+  if (stall.fetch == READY)
+  {
+    dprint("fetching%s!\n", "");
+    stall.fetch  = STALL;
+    fetch();
+    stall.decode = READY;
+  }
 }
 
 void lprocess_instruction() {
