@@ -337,7 +337,8 @@ PIPE_LINE_STAGE void decode()
       handle_rtype(code);
     }
 
-    break; case ADDI:
+    break; case ADDIU:
+           case ADDI:
     {
       dprint("Decoded: %s\n", "ADDI");
 
@@ -787,47 +788,35 @@ PIPE_LINE_STAGE void writeback()
   }
 }
 
+#define log_history(stage, ch) pipeline_history[HISTORY_LINE_LENGTH * stage##_count + cycle_number] =  (status.stage == STATUS_READY) ? ch : '-'
 
 void process_instruction() 
 {
+  log_history(writeback, 'w');
+  log_history(memory, 'm');
+  log_history(execute, 'e');
+
   if (status.writeback == STATUS_READY)
   {
-    pipeline_history[HISTORY_LINE_LENGTH * writeback_count + cycle_number] = 'w';
     writeback_count++;
     writeback();
     status.writeback = STATUS_STALL;
   }
-  else
-  {
-    pipeline_history[HISTORY_LINE_LENGTH * writeback_count + cycle_number] = '-';
-  }
-
 
   if (status.memory == STATUS_READY)
   {
-
-    pipeline_history[HISTORY_LINE_LENGTH * memory_count + cycle_number] = 'm';
     memory_count++;
     status.writeback = STATUS_READY;
     memory();
     status.memory = STATUS_STALL;
   }
-  else
-  {
-    pipeline_history[HISTORY_LINE_LENGTH * memory_count + cycle_number] = '-';
-  }
 
   if (status.execute == STATUS_READY)
   {
-    pipeline_history[HISTORY_LINE_LENGTH * execute_count + cycle_number] = 'e';
     execute_count++;
     status.memory = STATUS_READY;
     execute();
     status.execute = STATUS_STALL;
-  }
-  else 
-  {
-    pipeline_history[HISTORY_LINE_LENGTH * execute_count + cycle_number] = '-';
   }
 
   if (status.decode == STATUS_READY)
@@ -846,17 +835,12 @@ void process_instruction()
 
       status.execute = STATUS_STALL;
 
-
-#ifdef PRINT_HISTORY
-      pipeline_history[HISTORY_LINE_LENGTH * decode_count + cycle_number] = '-';
-#endif
+      log_history(decode, 'd');
     }
     else
     {
-#ifdef PRINT_HISTORY
-      pipeline_history[HISTORY_LINE_LENGTH * decode_count + cycle_number] = 'd';
+      log_history(decode, 'd');
       decode_count++;
-#endif
       status.fetch = STATUS_READY;
       decode();
     }

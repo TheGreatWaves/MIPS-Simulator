@@ -226,7 +226,6 @@ void go() {
   while (RUN_BIT)
     cycle();
   printf("Simulator halted\n\n");
-  print_history();
 }
 
 /***************************************************************/ 
@@ -365,6 +364,12 @@ void get_command(FILE * dumpsim_file) {
    CURRENT_STATE.LO = lo_reg_value;
    NEXT_STATE.LO = lo_reg_value;
    break;
+  case 'p':
+  case 'P':
+  {
+    print_history();
+    break;
+  }
 
   default:
     printf("Invalid Command\n");
