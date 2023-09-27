@@ -25,6 +25,17 @@
 
 #define MIPS_REGS 32
 
+// Assume max cycle is 100 (Too much to fit on screen)
+#define HISTORY_LINE_LENGTH 40
+#define HISTORY_MAX_LINES 10
+#define HISTORY_BUFFER_SIZE HISTORY_LINE_LENGTH * HISTORY_MAX_LINES
+extern char pipeline_history[HISTORY_BUFFER_SIZE];
+extern u32 fetch_count;
+extern u32 decode_count;
+extern u32 execute_count;
+extern u32 memory_count;
+extern u32 writeback_count;
+
 typedef struct CPU_State_Struct {
 
   uint32_t PC;		/* program counter */

@@ -21,6 +21,7 @@
 #include <stdint.h>
 
 #include "shell.h"
+#include "types.h"
 
 /***************************************************************/
 /* Main memory.                                                */
@@ -152,17 +153,32 @@ void help() {
 /***************************************************************/
 void cycle() {                                                
 #ifdef DEBUG
-  printf("\n=== Cycle %u ===\n", INSTRUCTION_COUNT);
+  printf("\n=== Cycle %u ===\n", INSTRUCTION_COUNT + 1);
 #endif
 
   process_instruction();
 
   INSTRUCTION_COUNT++;
 
-  if (INSTRUCTION_COUNT >= 1000)
+  if (INSTRUCTION_COUNT >= 30)
   {
     CURRENT_STATE.REGS[15] = 0xffffffff;
     RUN_BIT = FALSE;
+  }
+}
+
+
+void print_history()
+{
+  printf("\n=== Printing History ===\n");
+  for (u32 i = HISTORY_LINE_LENGTH-1; i < HISTORY_BUFFER_SIZE; i += HISTORY_LINE_LENGTH)
+  {
+    pipeline_history[i] = '\n';
+  }
+
+  for (u32 i = 0; i < HISTORY_BUFFER_SIZE; i++)
+  {
+    printf("%c", pipeline_history[i]);
   }
 }
 
@@ -189,6 +205,8 @@ void run(int num_cycles) {
     }
     cycle();
   }
+
+
 }
 
 /***************************************************************/
@@ -208,6 +226,7 @@ void go() {
   while (RUN_BIT)
     cycle();
   printf("Simulator halted\n\n");
+  print_history();
 }
 
 /***************************************************************/ 
@@ -424,6 +443,14 @@ void load_program(char *program_filename) {
   printf("Read %d words from program into memory.\n\n", ii/4);
 }
 
+void reset_history()
+{
+  for (u32 i = 0; i < HISTORY_BUFFER_SIZE; i++)
+  {
+    pipeline_history[i] = ' ';
+  }
+}
+
 /************************************************************/
 /*                                                          */
 /* Procedure : initialize                                   */
@@ -434,6 +461,7 @@ void load_program(char *program_filename) {
 /************************************************************/
 void initialize(char *program_filename, int num_prog_files) 
 { 
+  reset_history();
   int i;
 
   init_memory();

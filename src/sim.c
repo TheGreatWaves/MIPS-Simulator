@@ -3,6 +3,17 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+#define PRINT_HISTORY
+
+char pipeline_history[HISTORY_BUFFER_SIZE];
+u32 fetch_count     = 0;
+u32 decode_count    = 0;
+u32 execute_count   = 0;
+u32 memory_count    = 0;
+u32 writeback_count = 0;
+
+u32 cycle_number = 0;
+
 /////////////////////////////////////
 // NOTE(Appy): Labels for organization
 #define PIPE_LINE_STAGE
@@ -46,22 +57,60 @@ typedef struct {
   u32 writeback: 1;
 } Stall;
 
-#define STALL 1
-#define READY 0
+#define STATUS_STALL 1
+#define STATUS_READY 0
 
-Stall stall = {
-  .fetch     = READY, // We kickstart fetching right away.
-  .decode    = STALL,
-  .execute   = STALL,
-  .memory    = STALL,
-  .writeback = STALL,  
+Stall status = {
+  .fetch     = STATUS_READY, // We kickstart fetching right away.
+  .decode    = STATUS_STALL,
+  .execute   = STATUS_STALL,
+  .memory    = STATUS_STALL,
+  .writeback = STATUS_STALL,  
 };
 
 /////////////////////////////////////
 // NOTE(Appy): Dependency detection
 
+#define REG_NOT_READY false
+#define REG_READY true
+
 // All of the registers starts off being ready.
-bool REG_READY[MIPS_REGS] = { true }; 
+bool REG_STATUS[MIPS_REGS] = 
+{
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+  REG_READY,
+}; 
+
 
 /////////////////////////////////////
 // NOTE(Appy): Pipeline Registers
@@ -170,11 +219,73 @@ inline void handle_rtype(u8 op)
     {
       if (CURRENT_STATE.REGS[R_V0] == 0x0A) {
         dprint("V0 == 0xA, terminating...%s\n", "");
+
+        // We can stop fetching.
+        status.fetch = STATUS_STALL;
         RUN_BIT = FALSE;
       }
     }
   }
+}
+
+// Returns TRUE if there is a dependency issue, false otherwise.
+inline bool has_dependency()
+{
+  enum EOPCODES instr = cast(enum EOPCODES, GET(OP, pr_if_id.instruction));
+
+  switch (instr)
+  {
+    break; case SPECIAL:
+    {
+      u8 code = GET(CD, pr_if_id.instruction);
+
+      switch (code)
+      {
+        case SYSCALL:
+        {
+          dprint("Data harzard detected for syscall, stalling %s\n", "decode");
+          return REG_STATUS[R_V0] == REG_NOT_READY;
+        }
+      }
+    }
+  }
   
+  // One of the registers we're reading from is not ready.
+  u8 rti = GET(RT, pr_if_id.instruction);
+  u8 rsi = GET(RS, pr_if_id.instruction);
+
+  if (REG_STATUS[rti] == REG_NOT_READY)
+  {
+    dprint("Data harzard detected for reg %u, stalling %s\n", pr_id_ex.rti, "decode");
+    return true;
+  }
+
+  if (REG_STATUS[rsi] == REG_NOT_READY)
+  {
+    dprint("Data harzard detected for reg %u, stalling %s\n", pr_id_ex.rdi, "decode");
+    return true;
+  }
+
+  return false;
+}
+
+
+inline void set_register_dependency()
+{
+  // If we are going to write back then we must set 
+  // the status of the register to not ready.
+  if (pr_id_ex.wbcs.RegWrite == RegWrite_yes)
+  {
+    // Find out which register we are writing to.
+    if (pr_id_ex.wbcs.RegDst == RegDst_rd)
+    {
+      REG_STATUS[pr_id_ex.rdi] = REG_NOT_READY;
+    }
+    else
+    {
+      REG_STATUS[pr_id_ex.rti] = REG_NOT_READY;
+    }
+  }
 }
 
 PIPE_LINE_STAGE void decode()
@@ -206,19 +317,22 @@ PIPE_LINE_STAGE void decode()
   {
     break; case SPECIAL: // R Type Instructions
     {
-      dprint("Decoded: %s\n", "SPECIAL");
-      // No need to write to memory
-      disable_memory();
-
-      pr_id_ex.wbcs.MemToReg = 0; // Select from ALU result to be written back.
-      pr_id_ex.wbcs.RegWrite = 1; // We need to write to the register.
-
-      // Execute
-      pr_id_ex.ecs.ALUSrc    = 1; // 2nd ALU operands comes from the Register File.
-      pr_id_ex.wbcs.RegDst   = RegDst_rd; // Destination register is $rd.
-
       // Find out the ALUOp
       u8 code = GET(CD, pr_if_id.instruction);
+
+      // Typical R type instruction. The only exception we have is SYSCALL.
+      if (code != SYSCALL)
+      {
+        // No need to write to memory
+        disable_memory();
+
+        pr_id_ex.wbcs.MemToReg = 0; // Select from ALU result to be written back.
+        pr_id_ex.wbcs.RegWrite = 1; // We need to write to the register.
+
+        // Execute
+        pr_id_ex.ecs.ALUSrc    = 1; // 2nd ALU operands comes from the Register File.
+        pr_id_ex.wbcs.RegDst   = RegDst_rd; // Destination register is $rd.
+      }
 
       handle_rtype(code);
     }
@@ -240,7 +354,7 @@ PIPE_LINE_STAGE void decode()
 
     break; case LUI:
     {
-      dprint("Decoded: %s\n", "ADDI");
+      dprint("Decoded: %s\n", "LUI");
 
       pr_id_ex.wbcs.RegDst = RegDst_rt;
       pr_id_ex.wbcs.RegWrite = RegWrite_yes;
@@ -298,6 +412,8 @@ PIPE_LINE_STAGE void decode()
       disable_memory();
     }
   }
+
+  set_register_dependency();
 }
 
 inline void choose_register_destination()
@@ -649,52 +765,112 @@ inline u32 write_back_data()
   }
 }
 
+
+inline void set_register_ready()
+{
+  if (status.decode == STATUS_STALL) // if decode is stalling, we can now set it to ready.
+  {
+    status.decode = STATUS_READY;
+  }
+
+  REG_STATUS[pr_mem_wb.rd] = true;
+}
+
 PIPE_LINE_STAGE void writeback()
 {
   if (pr_mem_wb.wbcs.RegWrite == RegWrite_yes)
   {
     dprint("Writing %u to register %u\n", write_back_data(), pr_mem_wb.rd);
     CURRENT_STATE.REGS[pr_mem_wb.rd] = write_back_data();
+
+    set_register_ready();
   }
 }
 
+
 void process_instruction() 
 {
-  if (stall.writeback == READY)
+  if (status.writeback == STATUS_READY)
   {
-    stall.writeback  = STALL;
+    pipeline_history[HISTORY_LINE_LENGTH * writeback_count + cycle_number] = 'w';
+    writeback_count++;
     writeback();
-    stall.fetch = READY;
+    status.writeback = STATUS_STALL;
+  }
+  else
+  {
+    pipeline_history[HISTORY_LINE_LENGTH * writeback_count + cycle_number] = '-';
   }
 
-  if (stall.memory == READY)
+
+  if (status.memory == STATUS_READY)
   {
-    stall.memory  = STALL;
+
+    pipeline_history[HISTORY_LINE_LENGTH * memory_count + cycle_number] = 'm';
+    memory_count++;
+    status.writeback = STATUS_READY;
     memory();
-    stall.writeback = READY;
+    status.memory = STATUS_STALL;
+  }
+  else
+  {
+    pipeline_history[HISTORY_LINE_LENGTH * memory_count + cycle_number] = '-';
   }
 
-  if (stall.execute == READY)
+  if (status.execute == STATUS_READY)
   {
-    stall.execute   = STALL;
+    pipeline_history[HISTORY_LINE_LENGTH * execute_count + cycle_number] = 'e';
+    execute_count++;
+    status.memory = STATUS_READY;
     execute();
-    stall.memory = READY;
+    status.execute = STATUS_STALL;
+  }
+  else 
+  {
+    pipeline_history[HISTORY_LINE_LENGTH * execute_count + cycle_number] = '-';
   }
 
-  if (stall.decode == READY)
+  if (status.decode == STATUS_READY)
   {
-    stall.decode = STALL;
-    decode();
-    stall.execute = READY;
+    status.execute = STATUS_READY;
+
+    // Check if decode is causes data hazard.
+    if (has_dependency())
+    {
+      // Avoid overwriting!!
+      // We are stalling decode so we also have to stall fetch!
+      status.fetch = STATUS_STALL;
+
+      // This can only be reactivated during the writeback stage. (No data forward)
+      status.decode = STATUS_STALL;
+
+      status.execute = STATUS_STALL;
+
+
+#ifdef PRINT_HISTORY
+      pipeline_history[HISTORY_LINE_LENGTH * decode_count + cycle_number] = '-';
+#endif
+    }
+    else
+    {
+#ifdef PRINT_HISTORY
+      pipeline_history[HISTORY_LINE_LENGTH * decode_count + cycle_number] = 'd';
+      decode_count++;
+#endif
+      status.fetch = STATUS_READY;
+      decode();
+    }
   }
 
-  if (stall.fetch == READY)
+  if (status.fetch == STATUS_READY)
   {
-    dprint("fetching%s!\n", "");
-    stall.fetch  = STALL;
+    pipeline_history[HISTORY_LINE_LENGTH * fetch_count + cycle_number] = 'f';
+    fetch_count++;
+    status.decode = STATUS_READY;
     fetch();
-    stall.decode = READY;
   }
+
+  cycle_number++;
 }
 
 void lprocess_instruction() {
