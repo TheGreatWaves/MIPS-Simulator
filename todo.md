@@ -7,7 +7,6 @@ SLTIU
 ANDI 
 ORI
 XORI 
-LUI 
 LB 
 LH 
 LBU
@@ -26,8 +25,6 @@ SRLV
 SRAV 
 JR 
 JALR 
-ADD 
-ADDU
 SUB 
 SUBU 
 AND 

@@ -216,6 +216,8 @@ inline void set_alu_op(u8 op)
 
 inline void handle_rtype(u8 op)
 {
+  // Set the ALUOp.
+
   switch(op)
   {
     break; case SYSCALL:
@@ -227,6 +229,11 @@ inline void handle_rtype(u8 op)
         status.fetch = STATUS_STALL;
         RUN_BIT = FALSE;
       }
+    }
+    break; case ADD:
+           case ADDU:
+    {
+      pr_id_ex.ecs.ALUOp = ALUOp_ADD;
     }
   }
 }
@@ -257,19 +264,7 @@ inline bool has_dependency()
   u8 rti = GET(RT, pr_if_id.instruction);
   u8 rsi = GET(RS, pr_if_id.instruction);
 
-  if (REG_STATUS[rti] == REG_NOT_READY)
-  {
-    dprint("Data harzard detected for reg %u, stalling %s\n", pr_id_ex.rti, "decode");
-    return true;
-  }
-
-  if (REG_STATUS[rsi] == REG_NOT_READY)
-  {
-    dprint("Data harzard detected for reg %u, stalling %s\n", pr_id_ex.rdi, "decode");
-    return true;
-  }
-
-  return false;
+  return (REG_STATUS[rti] == REG_NOT_READY) || (REG_STATUS[rsi] == REG_NOT_READY);
 }
 
 
@@ -310,8 +305,6 @@ inline void retrieve_values()
 {
   // Forward the PC
   pr_id_ex.pc = pr_if_id.pc;
-
-  dprint("forwarded pc: 0x%x\n", pr_id_ex.pc);
 
   // Store register numbers
   pr_id_ex.rsi = GET(RS, pr_if_id.instruction);
