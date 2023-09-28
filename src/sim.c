@@ -122,9 +122,10 @@ inline void set_alu_op(u8 op)
   pr_id_ex.ecs.ALUOp = op;
 }
 
-inline void handle_rtype(u8 op)
+void handle_rtype(u8 op)
 {
   // Set the ALUOp.
+  dprint("Hanlding RTYPE: %u\n", op);
 
   switch(op)
   {
@@ -143,6 +144,35 @@ inline void handle_rtype(u8 op)
     {
       pr_id_ex.ecs.ALUOp = ALUOp_ADD;
     }
+    break; case SUB:
+           case SUBU:
+    {
+      pr_id_ex.ecs.ALUOp = ALUOp_SUB;
+    }
+    break; case SLL:
+    {
+      pr_id_ex.ecs.ALUOp = ALUOp_SLL;
+    }
+    break; case SLLV:
+    {
+      pr_id_ex.ecs.ALUOp = ALUOp_SLLV;
+    }
+    break; case SRL:
+    {
+      pr_id_ex.ecs.ALUOp = ALUOp_SRL;
+    }
+    break; case SRLV:
+    {
+      pr_id_ex.ecs.ALUOp = ALUOp_SRLV;
+    }
+    break; case SRA:
+    {
+      pr_id_ex.ecs.ALUOp = ALUOp_SRA;
+    }
+    break; case SRAV:
+    {
+      pr_id_ex.ecs.ALUOp = ALUOp_SRAV;
+    }
     break; case MTLO:
     {
       pr_id_ex.ecs.ALUOp = ALUOp_ADD;
@@ -153,8 +183,30 @@ inline void handle_rtype(u8 op)
     }
     break; case JR:
     {
+      dprint("Handling %s\n", "JR");
       pr_id_ex.ja = pr_id_ex.rsv;
       pr_id_ex.wbcs.PCSrc = PCSrc_jump; 
+
+      // Stall fetch and decode.
+      status.fetch = STATUS_STALL;
+      status.decode = STATUS_STALL;
+    }
+
+    break; case JALR:
+    {
+      dprint("Handling %s\n", "JALR");
+      pr_id_ex.ja = pr_id_ex.rsv;
+      pr_id_ex.wbcs.PCSrc = PCSrc_jump; 
+
+      // I don't know why but I'm going to forward it to add
+      pr_id_ex.wbcs.RegDst = RegDst_rd;
+      pr_id_ex.wbcs.RegWrite = RegWrite_yes;
+
+      pr_id_ex.ecs.ALUOp = ALUOp_ADD;
+      pr_id_ex.rsv = 4;
+      pr_id_ex.rtv = pr_id_ex.pc;
+
+      pr_id_ex.rdi = 31;
 
       // Stall fetch and decode.
       status.fetch = STATUS_STALL;
@@ -389,6 +441,7 @@ PIPE_LINE_STAGE void decode()
       switch(code)
       {
       break; case SYSCALL:
+      break; case JALR:
       break; case JR:
       break; case MTHI: pr_id_ex.wbcs.RegDst = RegDst_hi;
       break; case MTLO: pr_id_ex.wbcs.RegDst = RegDst_lo;
@@ -630,6 +683,37 @@ void execute_alu()
     {
       dprint("ALU ADD: %u + %u = %u\n", operand_a(), operand_b(), operand_a() + operand_b());
       set_alu_result(operand_a() + operand_b());
+    }
+    break; case ALUOp_SLL: 
+    {
+      set_alu_result(operand_b() << GET(SA, pr_id_ex.imm));
+    }
+    break; case ALUOp_SRL: 
+    {
+      set_alu_result(operand_b() >> GET(SA, pr_id_ex.imm));
+    }
+    break; case ALUOp_SLLV: 
+    {
+      set_alu_result(operand_b() << (operand_a() & MASK(5)));
+    }
+    break; case ALUOp_SRLV: 
+    {
+      set_alu_result(operand_b() >> (operand_a() & MASK(5)));
+    }
+    break; case ALUOp_SRA: 
+    {
+      dprint("ALU SRA%s\n", "");
+      uint8_t sa = GET(SA, pr_id_ex.imm);
+      dprint("SA: %u\n", sa);
+
+      uint32_t operand = operand_b();
+      uint32_t result = (cast(int, operand) >> sa);
+      set_alu_result(result);
+    }
+    break; case ALUOp_SRAV: 
+    {
+      dprint("ALU SRAV%s\n", "");
+      set_alu_result(cast(s32, operand_b()) >> (operand_a() & MASK(5)));
     }
     break; case ALUOp_LUI:
     {
