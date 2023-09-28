@@ -176,7 +176,7 @@ void cycle() {
 
   INSTRUCTION_COUNT++;
 
-  if (INSTRUCTION_COUNT >= 500)
+  if (INSTRUCTION_COUNT >= MAX_CYCLES)
   {
     CURRENT_STATE.REGS[15] = 0xffffffff;
     RUN_BIT = FALSE;
@@ -781,8 +781,10 @@ void test()
 {
   reset();
   int count = 0;
-  for (int i=0; i<10; i++)
+  for (int i=0; i<52; i++)
   {
+    reset();
+
     int res = 0;
     // overload some tests (sorry), these ones kinda need to work
     switch(i)
@@ -802,10 +804,8 @@ void test()
     int v = (res == 0) ? 1 : 0;
     count += v;
     if (v==1) printf("[+]: %s\n", instructions[i]);
-    else printf("[-]: %s\n", instructions[i]);
+    else printf("[-]: %s, got value %d\n", instructions[i], res);
     results[i] = v;
-
-    reset();
   }
 
   printf("=============================================\n");

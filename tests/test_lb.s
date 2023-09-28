@@ -34,6 +34,40 @@ test_lb:
 	bne $t1, $t2, inf
 	sw $zero, 0($3)
 	jal reset
+test_lb_none:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0xab00
+
+	# Save in memory
+	sw $t0, 0($3)
+
+	# Load data back into $t1
+	lb $t1, 0($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sw $zero, 0($3)
+	jal reset
+test_lb_shift:
+	lui $3, 0x1000
+
+	# Set values
+	ori $t0, $zero, 0xabcd
+	lui $t2, 0xffff
+	ori $t2, $t2, 0xffab
+
+	# Save in memory
+	sw $t0, 0($3)
+
+	# Load data back into $t1
+	lb $t1, 1($3)
+
+	# Should be the same
+	bne $t1, $t2, inf
+	sw $zero, 0($3)
+	jal reset
 done:
         j exit
 inf:

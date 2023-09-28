@@ -29,8 +29,9 @@
 #define ALLOW_PIPELINE_HISTORY
 
 // Assume max cycle is 100 (Too much to fit on screen)
-#define HISTORY_LINE_LENGTH 100
-#define HISTORY_MAX_LINES 40
+#define MAX_CYCLES 200
+#define HISTORY_LINE_LENGTH MAX_CYCLES
+#define HISTORY_MAX_LINES 100
 #define HISTORY_BUFFER_SIZE HISTORY_LINE_LENGTH * HISTORY_MAX_LINES
 extern char pipeline_history[HISTORY_BUFFER_SIZE];
 extern u32 fetch_count;
