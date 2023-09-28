@@ -69,6 +69,8 @@ void reset();
 
 #define R_V0 2
 #define R_RA 31
+#define R_LO 32
+#define R_HI 33
 
 /////////////////////////////////////
 // NOTE(Appy): Control Signals
@@ -87,7 +89,7 @@ typedef struct {
 
 typedef struct {
   u32 RegWrite: 1;
-  u32 RegDst:   1;
+  u32 RegDst:   2;
   u32 MemToReg: 1;
   u32 PCSrc:    2; 
 } WriteBackControlSignals;
@@ -112,7 +114,7 @@ typedef struct {
 #define REG_NOT_READY false
 #define REG_READY true
 
-extern bool REG_STATUS[MIPS_REGS];
+extern bool REG_STATUS[MIPS_REGS+2];
 
 /////////////////////////////////////
 // NOTE(Appy): Pipeline Registers

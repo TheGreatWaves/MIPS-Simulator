@@ -27,10 +27,11 @@ Stall status = {
   .writeback = STATUS_STALL,  
 };
 
-
 // All of the registers starts off being ready.
-bool REG_STATUS[MIPS_REGS] = 
+bool REG_STATUS[MIPS_REGS+2] = 
 {
+  REG_READY,
+  REG_READY,
   REG_READY,
   REG_READY,
   REG_READY,
@@ -142,6 +143,14 @@ inline void handle_rtype(u8 op)
     {
       pr_id_ex.ecs.ALUOp = ALUOp_ADD;
     }
+    break; case MTLO:
+    {
+      pr_id_ex.ecs.ALUOp = ALUOp_ADD;
+    }
+    break; case MTHI:
+    {
+      pr_id_ex.ecs.ALUOp = ALUOp_ADD;
+    }
   }
 }
 
@@ -158,10 +167,18 @@ inline bool has_dependency()
 
       switch (code)
       {
-        case SYSCALL:
+        break; case SYSCALL:
         {
           dprint("Data harzard detected for syscall, stalling %s\n", "decode");
           return REG_STATUS[R_V0] == REG_NOT_READY;
+        }
+        break; case MFHI:
+        {
+          return REG_STATUS[R_HI] == REG_NOT_READY;
+        }
+        break; case MFLO:
+        {
+          return REG_STATUS[R_LO] == REG_NOT_READY;
         }
       }
     }
@@ -182,13 +199,12 @@ inline void set_register_dependency()
   if (pr_id_ex.wbcs.RegWrite == RegWrite_yes)
   {
     // Find out which register we are writing to.
-    if (pr_id_ex.wbcs.RegDst == RegDst_rd)
+    switch (pr_id_ex.wbcs.RegDst)
     {
-      REG_STATUS[pr_id_ex.rdi] = REG_NOT_READY;
-    }
-    else
-    {
-      REG_STATUS[pr_id_ex.rti] = REG_NOT_READY;
+      break; case RegDst_hi: REG_STATUS[R_HI] = REG_NOT_READY;
+      break; case RegDst_lo: REG_STATUS[R_LO] = REG_NOT_READY;
+      break; case RegDst_rt: REG_STATUS[pr_id_ex.rti] = REG_NOT_READY;
+      break; case RegDst_rd: REG_STATUS[pr_id_ex.rdi] = REG_NOT_READY;
     }
   }
 }
@@ -298,19 +314,25 @@ PIPE_LINE_STAGE void decode()
       // Find out the ALUOp
       u8 code = GET(CD, pr_if_id.instruction);
 
-      // Typical R type instruction. The only exception we have is SYSCALL.
-      if (code != SYSCALL)
+      // We never need to write to memory
+      disable_memory();
+
+      // Execute
+      pr_id_ex.ecs.ALUSrc = ALUSrc_rt;
+
+      // Writeback
+      pr_id_ex.wbcs.MemToReg = MemToReg_ALU_result;         
+      pr_id_ex.wbcs.RegWrite = RegWrite_yes;        // We need to write to the register.
+
+      // Register destination
+      // The only reason I set it here like this and not inside handle_rtype() is so I don't forget.
+      // Refactor: Remove this later.
+      switch(code)
       {
-        // No need to write to memory
-        disable_memory();
-
-        // Execute
-        pr_id_ex.ecs.ALUSrc    = ALUSrc_rt;
-
-        // Writeback
-        pr_id_ex.wbcs.MemToReg = MemToReg_ALU_result;         
-        pr_id_ex.wbcs.RegWrite = RegWrite_yes;        // We need to write to the register.
-        pr_id_ex.wbcs.RegDst   = RegDst_rd;           // Destination register is $rd.
+      break; case SYSCALL:
+      break; case MTHI: pr_id_ex.wbcs.RegDst = RegDst_hi;
+      break; case MTLO: pr_id_ex.wbcs.RegDst = RegDst_lo;
+      break; default:   pr_id_ex.wbcs.RegDst = RegDst_rd; // Destination register is $rd.
       }
 
       handle_rtype(code);
@@ -445,6 +467,14 @@ inline void choose_register_destination()
   pr_ex_mem.rd = (pr_id_ex.wbcs.RegDst == 0) 
                   ? pr_id_ex.rti 
                   : pr_id_ex.rdi;
+
+  switch (pr_id_ex.wbcs.RegDst)
+  {
+    break; case RegDst_hi: pr_ex_mem.rd = R_HI;
+    break; case RegDst_lo: pr_ex_mem.rd = R_LO;
+    break; case RegDst_rt: pr_ex_mem.rd = pr_id_ex.rti;
+    break; case RegDst_rd: pr_ex_mem.rd = pr_id_ex.rdi;
+  }
 }
 
 inline void calculate_pc_target()
@@ -871,8 +901,14 @@ PIPE_LINE_STAGE void writeback()
   if (pr_mem_wb.wbcs.RegWrite == RegWrite_yes)
   {
     dprint("Writing %u to register %u\n", write_back_data(), pr_mem_wb.rd);
-    CURRENT_STATE.REGS[pr_mem_wb.rd] = write_back_data();
 
+    switch (pr_mem_wb.rd)
+    {
+      break; case R_HI: pr_ex_mem.rd = CURRENT_STATE.HI = write_back_data();
+      break; case R_LO: pr_ex_mem.rd = CURRENT_STATE.LO = write_back_data();
+      break; default: CURRENT_STATE.REGS[pr_mem_wb.rd] = write_back_data();
+    }
+    
     set_register_ready();
   }
 

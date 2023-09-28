@@ -177,6 +177,8 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 // NOTE(Appy): Control Signal Values
 #define RegDst_rt 0
 #define RegDst_rd 1
+#define RegDst_lo 2
+#define RegDst_hi 3
 
 #define RegWrite_no 0
 #define RegWrite_yes 1

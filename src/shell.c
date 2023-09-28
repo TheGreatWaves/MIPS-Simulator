@@ -97,6 +97,9 @@ void reset()
     CURRENT_STATE.REGS[i] = 0;
     REG_STATUS[i] = REG_READY;
   }
+  REG_STATUS[R_LO] = REG_READY;
+  REG_STATUS[R_HI] = REG_READY;
+
   INSTRUCTION_COUNT = 0;
 
   reset_control_signals();

@@ -1,5 +1,3 @@
-JAL 
-BNE 
 BLEZ 
 BGTZ
 SLTI 
