@@ -144,6 +144,20 @@ void handle_rtype(u8 op)
     {
       pr_id_ex.ecs.ALUOp = ALUOp_ADD;
     }
+    break; case MULT:
+    {
+      REG_STATUS[R_HI] = REG_NOT_READY;
+      REG_STATUS[R_LO] = REG_NOT_READY;
+
+      pr_id_ex.ecs.ALUOp = ALUOp_MULT;
+    }
+    break; case MULTU:
+    {
+      REG_STATUS[R_HI] = REG_NOT_READY;
+      REG_STATUS[R_LO] = REG_NOT_READY;
+
+      pr_id_ex.ecs.ALUOp = ALUOp_MULTU;
+    }
     break; case AND:
     {
       pr_id_ex.ecs.ALUOp = ALUOp_AND;
@@ -197,9 +211,22 @@ void handle_rtype(u8 op)
     {
       pr_id_ex.ecs.ALUOp = ALUOp_ADD;
     }
-    break; case MTHI:
+    break; case MFLO:
     {
       pr_id_ex.ecs.ALUOp = ALUOp_ADD;
+      pr_id_ex.rsv = 0;
+      pr_id_ex.rtv = CURRENT_STATE.LO;
+    }
+    break; case MTHI:
+    {
+      pr_id_ex.rdi = R_HI;
+      pr_id_ex.ecs.ALUOp = ALUOp_ADD;
+    }
+    break; case MFHI:
+    {
+      pr_id_ex.ecs.ALUOp = ALUOp_ADD;
+      pr_id_ex.rsv = 0;
+      pr_id_ex.rtv = CURRENT_STATE.HI;
     }
     break; case JR:
     {
@@ -527,7 +554,6 @@ PIPE_LINE_STAGE void decode()
       // AH yes I love imaginary ALUs.
       pr_id_ex.ecs.ALUOp = ALUOp_BGTZ;
     }
-
     break; case ADDIU:
            case ADDI:
     {
@@ -715,6 +741,36 @@ void execute_alu()
     break; case ALUOp_SRL: 
     {
       set_alu_result(operand_b() >> GET(SA, pr_id_ex.imm));
+    }
+    break; case ALUOp_MULT:
+    {
+      s32 a = cast(s32, operand_a());
+      s32 b = cast(s32, operand_b());
+      s64 result = cast(u64, a) * cast(u64, b);
+
+      CURRENT_STATE.HI = cast(u32, (result >> 32));
+      CURRENT_STATE.LO = cast(u32, result);
+
+      REG_STATUS[R_HI] = REG_READY;
+      REG_STATUS[R_LO] = REG_READY;
+    }
+    break; case ALUOp_MULTU:
+    {
+      u32 a = cast(u32, operand_a());
+      u32 b = cast(u32, operand_b());
+
+      u64 result = cast(u64, a) * cast(u64, b);
+
+      dprint("MULTU: %ld\n", result);
+
+      CURRENT_STATE.HI = cast(u32, (result >> 32));
+      CURRENT_STATE.LO = cast(u32, result);
+
+      dprint("LO: %x\n", CURRENT_STATE.LO);
+      dprint("HI: %x\n", CURRENT_STATE.HI);
+
+      REG_STATUS[R_HI] = REG_READY;
+      REG_STATUS[R_LO] = REG_READY;
     }
     break; case ALUOp_SLLV: 
     {
