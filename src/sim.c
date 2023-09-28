@@ -151,6 +151,15 @@ inline void handle_rtype(u8 op)
     {
       pr_id_ex.ecs.ALUOp = ALUOp_ADD;
     }
+    break; case JR:
+    {
+      pr_id_ex.ja = pr_id_ex.rsv;
+      pr_id_ex.wbcs.PCSrc = PCSrc_jump; 
+
+      // Stall fetch and decode.
+      status.fetch = STATUS_STALL;
+      status.decode = STATUS_STALL;
+    }
   }
 }
 
@@ -188,6 +197,16 @@ inline bool has_dependency()
   u8 rti = GET(RT, pr_if_id.instruction);
   u8 rsi = GET(RS, pr_if_id.instruction);
 
+  if (REG_STATUS[rti] == REG_NOT_READY)
+  {
+    dprint("Dependency for RT register: %u\n", rsi);
+  }
+
+  if (REG_STATUS[rsi] == REG_NOT_READY)
+  {
+    dprint("Dependency for RS register: %u\n", rti);
+  }
+
   return (REG_STATUS[rti] == REG_NOT_READY) || (REG_STATUS[rsi] == REG_NOT_READY);
 }
 
@@ -202,9 +221,9 @@ inline void set_register_dependency()
     switch (pr_id_ex.wbcs.RegDst)
     {
       break; case RegDst_hi: REG_STATUS[R_HI] = REG_NOT_READY;
-      break; case RegDst_lo: REG_STATUS[R_LO] = REG_NOT_READY;
-      break; case RegDst_rt: REG_STATUS[pr_id_ex.rti] = REG_NOT_READY;
-      break; case RegDst_rd: REG_STATUS[pr_id_ex.rdi] = REG_NOT_READY;
+      break; case RegDst_lo: REG_STATUS[R_LO] = REG_NOT_READY; 
+      break; case RegDst_rt: REG_STATUS[pr_id_ex.rti] = REG_NOT_READY; dprint("Register %u set to not ready\n", pr_id_ex.rti);
+      break; case RegDst_rd: REG_STATUS[pr_id_ex.rdi] = REG_NOT_READY; dprint("Register %u set to not ready\n", pr_id_ex.rdi);
     }
   }
 }
@@ -330,6 +349,7 @@ PIPE_LINE_STAGE void decode()
       switch(code)
       {
       break; case SYSCALL:
+      break; case JR:
       break; case MTHI: pr_id_ex.wbcs.RegDst = RegDst_hi;
       break; case MTLO: pr_id_ex.wbcs.RegDst = RegDst_lo;
       break; default:   pr_id_ex.wbcs.RegDst = RegDst_rd; // Destination register is $rd.
@@ -343,6 +363,8 @@ PIPE_LINE_STAGE void decode()
       dprint("Decoded: %s\n", "J");
 
       pr_id_ex.wbcs.PCSrc = PCSrc_jump; 
+
+      pr_id_ex.ja = (pr_id_ex.pc & 0xffff0000) | (pr_id_ex.imm << 2);
 
       // Stall fetch and decode.
       status.fetch = STATUS_STALL;
@@ -358,6 +380,8 @@ PIPE_LINE_STAGE void decode()
       pr_id_ex.wbcs.RegDst = RegDst_rd;
       pr_id_ex.wbcs.RegWrite = RegWrite_yes;
 
+      pr_id_ex.ja = (pr_id_ex.pc & 0xffff0000) | (pr_id_ex.imm << 2);
+
       pr_id_ex.ecs.ALUOp = ALUOp_ADD;
       pr_id_ex.rsv = 4;
       pr_id_ex.rtv = pr_id_ex.pc;
@@ -371,11 +395,13 @@ PIPE_LINE_STAGE void decode()
 
     break; case BEQ:
     {
+      dprint("Decoded: %s\n", "BEQ");
       template_branch_instruction();
       pr_id_ex.ecs.ALUOp = ALUOp_SUB;
     }
     break; case BNE:
     {
+      dprint("Decoded: %s\n", "BNE");
       template_branch_instruction();
 
       // AH yes I love imaginary ALUs.
@@ -488,10 +514,9 @@ inline void calculate_pc_target()
     break; case PCSrc_jump:
     {
       dprint("PC: 0x%x\n", pr_id_ex.pc);
-      pr_ex_mem.target = (pr_id_ex.pc & 0xFFFF0000) | pr_id_ex.ja;
+      pr_ex_mem.target = pr_id_ex.ja;
     }
   }
-
   // Default case is PC + 4.
 }
 
@@ -525,6 +550,7 @@ inline void set_alu_result(u32 v)
 
 void execute_alu()
 {
+  set_alu_result(0);
   switch (pr_id_ex.ecs.ALUOp)
   {
     break; case ALUOp_ADD: 
@@ -552,10 +578,11 @@ void execute_alu()
     }
     break; case ALUOp_BNE:
     {
-      set_alu_result((operand_a() != operand_b()) ? 0 : 1);
+      bool different = (operand_a() != operand_b());
+      set_alu_result(different ? 0 : 1);
+      dprint("ALU BNE: 0x%x != 0x%x = %u\n", operand_a(), operand_b(), (different ? 0 : 1));
     }
   }
-
 }
 
 PIPE_LINE_STAGE void execute()
@@ -900,7 +927,7 @@ PIPE_LINE_STAGE void writeback()
 {
   if (pr_mem_wb.wbcs.RegWrite == RegWrite_yes)
   {
-    dprint("Writing %u to register %u\n", write_back_data(), pr_mem_wb.rd);
+    dprint("Writing 0x%x to register %u\n", write_back_data(), pr_mem_wb.rd);
 
     switch (pr_mem_wb.rd)
     {
@@ -932,8 +959,14 @@ PIPE_LINE_STAGE void writeback()
   }
 }
 
+#ifdef ALLOW_PIPELINE_HISTORY
 #define log_history(stage, ch) \
 pipeline_history[HISTORY_LINE_LENGTH * stage##_count + cycle_number] = (status.stage == STATUS_READY) ? ch : '-'
+#define log_fetch(...) pipeline_history[HISTORY_LINE_LENGTH * fetch_count + cycle_number] = 'f';
+#else
+#define log_history(...)
+#define log_fetch(...)
+#endif
 
 void process_instruction() 
 {
@@ -971,7 +1004,6 @@ void process_instruction()
     // Check if decode is causes data hazard.
     if (has_dependency())
     {
-      printf("HEY IM RUNNING DECODE, DEPENDENCY!\n");
       // Avoid overwriting!!
       // We are stalling decode so we also have to stall fetch!
       status.fetch = STATUS_STALL;
@@ -985,7 +1017,6 @@ void process_instruction()
     }
     else
     {
-      printf("HEY IM RUNNING DECODE!\n");
       log_history(decode, 'd');
       decode_count++;
       status.fetch = STATUS_READY;
@@ -996,7 +1027,7 @@ void process_instruction()
 
   if (status.fetch == STATUS_READY)
   {
-    pipeline_history[HISTORY_LINE_LENGTH * fetch_count + cycle_number] = 'f';
+    log_fetch();
     fetch_count++;
     status.decode = STATUS_READY;
     fetch();
