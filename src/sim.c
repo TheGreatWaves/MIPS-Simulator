@@ -228,6 +228,11 @@ inline void set_register_dependency()
   }
 }
 
+inline void link_next_pc()
+{
+  CURRENT_STATE.REGS[31] = pr_id_ex.pc + 4;
+  REG_STATUS[31] = REG_NOT_READY;
+}
 
 // Read registers and sign extend the immediate and store them.
 inline void retrieve_values()
@@ -328,6 +333,41 @@ PIPE_LINE_STAGE void decode()
 
   switch (instr)
   {
+    break; case REGIMM:
+    {
+      u8 op = GET_BLOCK(pr_if_id.instruction, 16, 5);
+
+      switch (op)
+      {
+        break; case BLTZ:
+        {
+          template_branch_instruction();
+          pr_id_ex.ecs.ALUOp = ALUOp_BLTZ;
+        }   
+        break; case BGEZ:
+        {
+          template_branch_instruction();
+          pr_id_ex.ecs.ALUOp = ALUOp_BGEZ;
+        }   
+        break; case BLTZAL:
+        {
+          template_branch_instruction();
+
+          link_next_pc();
+
+          pr_id_ex.ecs.ALUOp = ALUOp_BLTZ;
+        }   
+        break; case BGEZAL:
+        {
+          template_branch_instruction();
+
+          link_next_pc();
+
+          pr_id_ex.ecs.ALUOp = ALUOp_BGEZ;
+        }   
+      }
+    }
+
     break; case SPECIAL: // R Type Instructions
     {
       // Find out the ALUOp
@@ -377,16 +417,9 @@ PIPE_LINE_STAGE void decode()
 
       pr_id_ex.wbcs.PCSrc = PCSrc_jump; 
 
-      pr_id_ex.wbcs.RegDst = RegDst_rd;
-      pr_id_ex.wbcs.RegWrite = RegWrite_yes;
-
       pr_id_ex.ja = (pr_id_ex.pc & 0xffff0000) | (pr_id_ex.imm << 2);
 
-      pr_id_ex.ecs.ALUOp = ALUOp_ADD;
-      pr_id_ex.rsv = 4;
-      pr_id_ex.rtv = pr_id_ex.pc;
-
-      pr_id_ex.rdi = 31;
+      link_next_pc();
 
       // Stall fetch and decode.
       status.fetch = STATUS_STALL;
@@ -407,6 +440,20 @@ PIPE_LINE_STAGE void decode()
       // AH yes I love imaginary ALUs.
       pr_id_ex.ecs.ALUOp = ALUOp_BNE;
     }
+    break; case BLEZ:
+    {
+      dprint("Decoded: %s\n", "BEQ");
+      template_branch_instruction();
+      pr_id_ex.ecs.ALUOp = ALUOp_BLEZ;
+    }
+    break; case BGTZ:
+    {
+      dprint("Decoded: %s\n", "BNE");
+      template_branch_instruction();
+
+      // AH yes I love imaginary ALUs.
+      pr_id_ex.ecs.ALUOp = ALUOp_BGTZ;
+    }
 
     break; case ADDIU:
            case ADDI:
@@ -414,6 +461,32 @@ PIPE_LINE_STAGE void decode()
       dprint("Decoded: %s\n", "ADDI");
       template_itype_instruction();
       set_alu_op(ALUOp_ADD);
+    }
+    break; case ANDI:
+    {
+      // Zero extend
+      pr_id_ex.imm &= 0xFFFF;
+      template_itype_instruction();
+      set_alu_op(ALUOp_AND);
+    }
+    break; case XORI:
+    {
+      // Zero extend
+      pr_id_ex.imm &= 0xFFFF;
+      template_itype_instruction();
+      set_alu_op(ALUOp_XOR);
+    }
+    break; case SLTI:
+    {
+      // Zero extend
+      template_itype_instruction();
+      set_alu_op(ALUOp_SLT);
+    }
+    break; case SLTIU:
+    {
+      // Zero extend
+      template_itype_instruction();
+      set_alu_op(ALUOp_SLTU);
     }
     break; case ORI:
     {
@@ -576,11 +649,43 @@ void execute_alu()
     {
       set_alu_result((cast(s32, operand_a()) < cast(s32, operand_b())) ? 1 : 0);
     }
+    break; case ALUOp_SLTU:
+    {
+      set_alu_result((cast(u32, operand_a()) < cast(u32, operand_b())) ? 1 : 0);
+    }
     break; case ALUOp_BNE:
     {
       bool different = (operand_a() != operand_b());
       set_alu_result(different ? 0 : 1);
       dprint("ALU BNE: 0x%x != 0x%x = %u\n", operand_a(), operand_b(), (different ? 0 : 1));
+    }
+    break; case ALUOp_BGTZ:
+    {
+      bool cond = (operand_a() != 0 && ((operand_a() >> 31) == 0));
+      set_alu_result(cond ? 0 : 1);
+    }
+    break; case ALUOp_BLTZ:
+    {
+      bool cond = (operand_a() >> 31) == 1;
+      set_alu_result(cond ? 0 : 1);
+    }
+    break; case ALUOp_BLEZ:
+    {
+      bool cond = (operand_a() == 0 || ((operand_a() >> 31) == 1));
+      set_alu_result(cond ? 0 : 1);
+    }
+    break; case ALUOp_BGEZ:
+    {
+      bool cond = (operand_a() >> 31) == 0;
+      set_alu_result(cond ? 0 : 1);
+    }
+    break; case ALUOp_AND:
+    {
+      set_alu_result(operand_a() & operand_b());
+    }
+    break; case ALUOp_XOR:
+    {
+      set_alu_result(operand_a() ^ operand_b());
     }
   }
 }
@@ -953,6 +1058,10 @@ PIPE_LINE_STAGE void writeback()
     {
       dprint("Branch not taken%s!\n", "");
     }
+
+    // This can be set whether branch is taken or not.
+    // So it has to be in the outside scope.
+    REG_STATUS[R_RA] = REG_READY;
 
     // We can safely resume fetch now.
     status.fetch = STATUS_READY;

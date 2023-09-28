@@ -9,29 +9,29 @@
 .text
 
 main:   
-        j start_test
+        j start_test       # 0
 reset:
-        addi $t0, $zero, 0
-        addi $t1, $zero, 0
-        addi $t2, $zero, 0
-        addi $t3, $zero, 0
-        addi $t4, $zero, 0
-        addi $t6, $t6, 1
-        mthi $zero
-        mtlo $zero
-        jr $ra
+        addi $t0, $zero, 0 # 4
+        addi $t1, $zero, 0 # 8
+        addi $t2, $zero, 0 # c
+        addi $t3, $zero, 0 # 10
+        addi $t4, $zero, 0 # 14
+        addi $t6, $t6, 1   # 18
+        mthi $zero         # 1c
+        mtlo $zero         # 20
+        jr $ra             # 24
 start_test:
 test_bgezal_take_1:
-	add $t1, $zero, $ra       # Record the return address.
-	bgezal $t0, bgezal_take_1 # Should return back here right away.
-	beq $ra, $t1, inf         # Should have changed
-	jal reset
-	j bgezal_take_done_1
+	add $t1, $zero, $ra       # Record the return address, write 0. 2c
+	bgezal $t0, bgezal_take_1 # Should return back here right away. 30
+	beq $ra, $t1, inf         # Should have changed 2c
+	jal reset		  # 34
+	j bgezal_take_done_1      # 38
 bgezal_take_1:
-	jr $ra
+	jr $ra                    # 3c
 bgezal_take_done_1:
 test_bgezal_take_2:
-	addi $t1, $zero, 69
+	addi $t1, $zero, 69       # 40
 	add $t1, $zero, $ra       # Record the return address.
 	bgezal $t0, bgezal_take_2 # Should return back here right away.
 	beq $ra, $t1, inf         # Should have changed
