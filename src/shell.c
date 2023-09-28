@@ -616,10 +616,9 @@ int test_jal()
 {
   test_file("jal");
   uint32_t r8 = CURRENT_STATE.REGS[8]; // $t0
-  uint32_t r9 = CURRENT_STATE.REGS[9]; // $t1
   uint32_t ra = CURRENT_STATE.REGS[31]; // $t1
 
-  if (r8==0 && r9==0 && ra==0x00400004) // Succeeded, jumped over.
+  if (r8==0 && ra==0x0040000c) // Succeeded, jumped over.
   {
     return 0;
   }

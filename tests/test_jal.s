@@ -3,9 +3,14 @@
 .text
 
 main:   
+        lui $t1, 0x0040
+        ori $t1, $t1, 0xc
         jal exit                                 # 0x00
-        addiu $t0, $zero, 5                    # 0x04
-        addiu $t1, $zero, 10                   # 0x10
+        addi $t0, $0, 5
 exit:
+        beq $t1, $31, nice
+oops:
+        j oops
+nice:
         addiu $v0, $zero, 0xa                  # 0x14
         syscall

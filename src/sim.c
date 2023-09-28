@@ -260,6 +260,21 @@ inline void template_itype_instruction()
   pr_id_ex.wbcs.MemToReg = MemToReg_ALU_result;
 }
 
+inline void template_branch_instruction()
+{
+  pr_id_ex.wbcs.PCSrc = PCSrc_branch;
+  pr_id_ex.wbcs.RegWrite = RegWrite_no;
+  pr_id_ex.ecs.ALUSrc = ALUSrc_rt;
+
+  disable_memory();
+
+  // Stall fetch we have to wait now.
+  status.fetch = STATUS_STALL;
+
+  // We won't be decoding as well, so we stall.
+  status.decode = STATUS_STALL;
+}
+
 PIPE_LINE_STAGE void decode()
 {
   // Reset control signals, so we only have to worry about setting true values.
@@ -312,21 +327,37 @@ PIPE_LINE_STAGE void decode()
       status.decode = STATUS_STALL;
     }
 
+    break; case JAL:
+    {
+      dprint("Decoded: %s\n", "J");
+
+      pr_id_ex.wbcs.PCSrc = PCSrc_jump; 
+
+      pr_id_ex.wbcs.RegDst = RegDst_rd;
+      pr_id_ex.wbcs.RegWrite = RegWrite_yes;
+
+      pr_id_ex.ecs.ALUOp = ALUOp_ADD;
+      pr_id_ex.rsv = 4;
+      pr_id_ex.rtv = pr_id_ex.pc;
+
+      pr_id_ex.rdi = 31;
+
+      // Stall fetch and decode.
+      status.fetch = STATUS_STALL;
+      status.decode = STATUS_STALL;
+    }
+
     break; case BEQ:
     {
-      dprint("Decoded: %s\n", "BEQ");
-      pr_id_ex.wbcs.PCSrc = PCSrc_branch;
-      pr_id_ex.wbcs.RegWrite = RegWrite_no;
-      pr_id_ex.ecs.ALUSrc = ALUSrc_rt;
+      template_branch_instruction();
       pr_id_ex.ecs.ALUOp = ALUOp_SUB;
+    }
+    break; case BNE:
+    {
+      template_branch_instruction();
 
-      disable_memory();
-
-      // Stall fetch we have to wait now.
-      status.fetch = STATUS_STALL;
-
-      // We won't be decoding as well, so we stall.
-      status.decode = STATUS_STALL;
+      // AH yes I love imaginary ALUs.
+      pr_id_ex.ecs.ALUOp = ALUOp_BNE;
     }
 
     break; case ADDIU:
@@ -335,6 +366,13 @@ PIPE_LINE_STAGE void decode()
       dprint("Decoded: %s\n", "ADDI");
       template_itype_instruction();
       set_alu_op(ALUOp_ADD);
+    }
+    break; case ORI:
+    {
+      // Zero extend
+      pr_id_ex.imm &= 0xFFFF;
+      template_itype_instruction();
+      set_alu_op(ALUOp_OR);
     }
     break; case LUI:
     {
@@ -455,7 +493,7 @@ inline void set_alu_result(u32 v)
   pr_ex_mem.alu_res = v;
 }
 
-inline void execute_alu()
+void execute_alu()
 {
   switch (pr_id_ex.ecs.ALUOp)
   {
@@ -473,6 +511,18 @@ inline void execute_alu()
     {
       dprint("ALU SUB: %u - %u = %u\n", operand_a(), operand_b(), operand_a() - operand_b());
       set_alu_result(operand_a() - operand_b());
+    }
+    break; case ALUOp_OR:
+    {
+      set_alu_result(operand_a() | operand_b());
+    }
+    break; case ALUOp_SLT:
+    {
+      set_alu_result((cast(s32, operand_a()) < cast(s32, operand_b())) ? 1 : 0);
+    }
+    break; case ALUOp_BNE:
+    {
+      set_alu_result((operand_a() != operand_b()) ? 0 : 1);
     }
   }
 
@@ -808,7 +858,7 @@ inline u32 write_back_data()
 
 inline void set_register_ready()
 {
-  if (status.decode == STATUS_STALL) // if decode is stalling, we can now set it to ready.
+  if (status.decode == STATUS_STALL && fetch_count > decode_count) // if decode is stalling, we can now set it to ready.
   {
     status.decode = STATUS_READY;
   }

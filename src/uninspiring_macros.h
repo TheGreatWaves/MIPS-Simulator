@@ -208,6 +208,9 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define ALUOp_ADD 1
 #define ALUOp_SUB 2
 #define ALUOp_LUI 3
+#define ALUOp_OR 4
+#define ALUOp_SLT 5
+#define ALUOp_BNE 6
 
 
 #endif /* APPY_SACRILEGIOUS_MACROS */
