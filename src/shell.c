@@ -95,8 +95,21 @@ void reset()
   for (int i = 0; i < 32; i++)
   {
     CURRENT_STATE.REGS[i] = 0;
+    REG_STATUS[i] = REG_READY;
   }
   INSTRUCTION_COUNT = 0;
+
+  reset_control_signals();
+  reset_stall();
+  reset_history();
+
+  cycle_number = 0;
+  fetch_count     = 0;
+  decode_count    = 0;
+  execute_count   = 0;
+  memory_count    = 0;
+  writeback_count = 0;
+
   RUN_BIT = TRUE;
 }
 
@@ -466,7 +479,8 @@ void reset_history()
 /************************************************************/
 void initialize(char *program_filename, int num_prog_files) 
 { 
-  reset_history();
+  reset();
+
   int i;
 
   init_memory();
@@ -474,7 +488,7 @@ void initialize(char *program_filename, int num_prog_files)
     load_program(program_filename);
     while(*program_filename++ != '\0');
   }
-  NEXT_STATE = CURRENT_STATE;
+
     
   RUN_BIT = TRUE;
 }
@@ -518,8 +532,6 @@ int test_file(char* name)
   sprintf(path, "../tests/test_%s.x", name);
   initialize(path, 1);
   go();
-
-
   
   return (int) CURRENT_STATE.REGS[15];
 }
@@ -594,6 +606,8 @@ int test_j()
   }
   else
   {
+    printf("r8: 0x%x\n", r8);
+    printf("r9: 0x%x\n", r9);
     return -1;
   }
 }
@@ -733,6 +747,8 @@ int test_mtlo()
 
 int test_lui()
 {
+  reset();
+
   test_file("lui");
 
   if (CURRENT_STATE.REGS[8] == 0xffff0000) // Succeeded, jumped over.
@@ -763,24 +779,23 @@ void test()
 {
   reset();
   int count = 0;
-  for (int i=19; i<20; i++)
+  for (int i=0; i<10; i++)
   {
     int res = 0;
     // overload some tests (sorry), these ones kinda need to work
     switch(i)
     {
-      // break; case 0: res = test_j();
-      // break; case 1: res = test_jal();
-      // break; case 2: res = test_jr();
-      // break; case 3: res = test_addi();
-      // break; case 4: res = test_mthi();
-      // break; case 5: res = test_mtlo();
-      // break; case 6: res = test_beq();
-      // break; case 7: res = test_bne();
-      // break; case 8: res = test_ori();
-      // break; case 9: res = test_lui();
-      break; case 19: res = test_lw();
-      // break; default: res = test_file(instructions[i]);
+      break; case 0: res = test_j();
+      break; case 1: res = test_jal();
+      break; case 2: res = test_jr();
+      break; case 3: res = test_addi();
+      break; case 4: res = test_mthi();
+      break; case 5: res = test_mtlo();
+      break; case 6: res = test_beq();
+      break; case 7: res = test_bne();
+      break; case 8: res = test_ori();
+      break; case 9: res = test_lui();
+      break; default: res = test_file(instructions[i]);
     }
     int v = (res == 0) ? 1 : 0;
     count += v;
@@ -816,6 +831,31 @@ void test()
   }
 }
 #endif
+
+inline void reset_control_signals()
+{
+  pr_id_ex.ecs.ALUOp  = 0;
+  pr_id_ex.ecs.ALUSrc = 0;
+
+  pr_id_ex.mcs.MemRead    = 0;
+  pr_id_ex.mcs.MemWrite   = 0;
+  pr_id_ex.mcs.LoadSz     = 0;
+  pr_id_ex.mcs.SignExtend = 0;
+ 
+  pr_id_ex.wbcs.PCSrc    = 0;
+  pr_id_ex.wbcs.RegDst   = 0;
+  pr_id_ex.wbcs.RegWrite = 0;
+  pr_id_ex.wbcs.MemToReg = 0;
+}
+
+void reset_stall()
+{
+  status.fetch     = STATUS_READY; // We kickstart fetching right away.
+  status.decode    = STATUS_STALL;
+  status.execute   = STATUS_STALL;
+  status.memory    = STATUS_STALL;
+  status.writeback = STATUS_STALL;  
+}
 
 int main(int argc, char *argv[]) {                              
 #ifndef TEST_MODE

@@ -17,52 +17,7 @@ u32 writeback_count = 0;
 u32 cycle_number = 0;
 
 /////////////////////////////////////
-// NOTE(Appy): Labels for organization
-#define PIPE_LINE_STAGE
-#define PIPE_LINE_REGISTER
-
-/////////////////////////////////////
-// NOTE(Appy): Registers
-
-#define R_V0 2
-#define R_RA 31
-
-/////////////////////////////////////
-// NOTE(Appy): Control Signals
-
-typedef struct {
-  u32 ALUSrc: 1;
-  u32 ALUOp:  3;
-} ExecuteControlSignals;
-
-typedef struct {
-  u32 MemRead:    1;
-  u32 MemWrite:   1;
-  u32 LoadSz:     2;
-  u32 SignExtend: 1;
-} MemoryControlSignals;
-
-typedef struct {
-  u32 RegWrite: 1;
-  u32 RegDst:   1;
-  u32 MemToReg: 1;
-  u32 PCSrc:    2; 
-} WriteBackControlSignals;
-
-
-/////////////////////////////////////
 // NOTE(Appy): Pipeline stalls
-
-typedef struct {
-  u32 fetch:     1; 
-  u32 decode:    1;
-  u32 execute:   1;
-  u32 memory:    1;
-  u32 writeback: 1;
-} Stall;
-
-#define STATUS_STALL 1
-#define STATUS_READY 0
 
 Stall status = {
   .fetch     = STATUS_READY, // We kickstart fetching right away.
@@ -72,11 +27,6 @@ Stall status = {
   .writeback = STATUS_STALL,  
 };
 
-/////////////////////////////////////
-// NOTE(Appy): Dependency detection
-
-#define REG_NOT_READY false
-#define REG_READY true
 
 // All of the registers starts off being ready.
 bool REG_STATUS[MIPS_REGS] = 
@@ -115,59 +65,13 @@ bool REG_STATUS[MIPS_REGS] =
   REG_READY,
 }; 
 
-
 /////////////////////////////////////
 // NOTE(Appy): Pipeline Registers
 
-/* IF/ID */
-PIPE_LINE_REGISTER struct {
-  u32 instruction;
-  u32 pc;
-} pr_if_id;
-
-/* ID/EX */
-PIPE_LINE_REGISTER struct {
-  /* Data */
-  u32 pc;   // Program counter
-  u32 imm;  // Sign extended immediate
-  u32 ja;   // Jump address
-
-  /* Register index */
-  u8  rsi;  
-  u8  rti;  
-  u8  rdi;
-
-  /* Register values */
-  u32 rsv;   // REGS[$RS] 
-  u32 rtv;   // REGS[$RT]
-
-  /* Control Signals */
-  ExecuteControlSignals   ecs;
-  MemoryControlSignals    mcs;
-  WriteBackControlSignals wbcs;
-} pr_id_ex;
-
-PIPE_LINE_REGISTER struct 
-{
-  u32                     alu_res;
-  u32                     mem_res;
-  u32                     target;
-  u8                      rd;       // EX_WriteRegister
-  u32                     rtv;      // REGS[$RT]
-  MemoryControlSignals    mcs;
-  WriteBackControlSignals wbcs;
-  bool                    branch;
-} pr_ex_mem;
-
-PIPE_LINE_REGISTER struct 
-{
-  u32                     memory_read;
-  u32                     alu_res;
-  u32                     mem_res;
-  u32                     target;
-  u8                      rd;
-  WriteBackControlSignals wbcs;
-} pr_mem_wb;
+PR_IF_ID pr_if_id;
+PR_ID_EX pr_id_ex;
+PR_EX_MEM pr_ex_mem;
+PR_MEM_WB pr_mem_wb;
 
 /////////////////////////////////////
 // NOTE(Appy): Pipeline Stages
@@ -289,21 +193,6 @@ inline void set_register_dependency()
   }
 }
 
-inline void reset_control_signals()
-{
-  pr_id_ex.ecs.ALUOp  = 0;
-  pr_id_ex.ecs.ALUSrc = 0;
-
-  pr_id_ex.mcs.MemRead    = 0;
-  pr_id_ex.mcs.MemWrite   = 0;
-  pr_id_ex.mcs.LoadSz     = 0;
-  pr_id_ex.mcs.SignExtend = 0;
- 
-  pr_id_ex.wbcs.PCSrc    = 0;
-  pr_id_ex.wbcs.RegDst   = 0;
-  pr_id_ex.wbcs.RegWrite = 0;
-  pr_id_ex.wbcs.MemToReg = 0;
-}
 
 // Read registers and sign extend the immediate and store them.
 inline void retrieve_values()
@@ -338,27 +227,37 @@ inline void retrieve_values()
 
 inline void template_load_instruction()
 {
+  pr_id_ex.ecs.ALUSrc = ALUSrc_immediate;
+  pr_id_ex.ecs.ALUOp = ALUOp_ADD;
+
   // We need to read the data (load!)
   enable_memory_r();
 
   pr_id_ex.wbcs.RegDst = RegDst_rt;
   pr_id_ex.wbcs.RegWrite = RegWrite_yes;
-
-  pr_id_ex.ecs.ALUSrc = ALUSrc_immediate;
-  pr_id_ex.ecs.ALUOp = ALUOp_ADD;
-
   pr_id_ex.wbcs.MemToReg = MemToReg_memory_data;
 }
 
 inline void template_store_instruction()
 {
+  pr_id_ex.ecs.ALUSrc = ALUSrc_immediate;
+  pr_id_ex.ecs.ALUOp = ALUOp_ADD;
+
   // We need to write the data.
   enable_memory_w();
 
   pr_id_ex.wbcs.RegWrite = RegWrite_no;
+}
 
+inline void template_itype_instruction()
+{
   pr_id_ex.ecs.ALUSrc = ALUSrc_immediate;
-  pr_id_ex.ecs.ALUOp = ALUOp_ADD;
+
+  disable_memory();
+
+  pr_id_ex.wbcs.RegDst = RegDst_rt;
+  pr_id_ex.wbcs.RegWrite = RegWrite_yes;
+  pr_id_ex.wbcs.MemToReg = MemToReg_ALU_result;
 }
 
 PIPE_LINE_STAGE void decode()
@@ -434,35 +333,15 @@ PIPE_LINE_STAGE void decode()
            case ADDI:
     {
       dprint("Decoded: %s\n", "ADDI");
-
-      pr_id_ex.wbcs.RegDst = RegDst_rt;
-      pr_id_ex.wbcs.RegWrite = RegWrite_yes;
-      pr_id_ex.ecs.ALUSrc = ALUSrc_immediate;
-
+      template_itype_instruction();
       set_alu_op(ALUOp_ADD);
-
-      disable_memory();
-
-      pr_id_ex.wbcs.MemToReg = MemToReg_ALU_result;
-
     }
-
     break; case LUI:
     {
       dprint("Decoded: %s\n", "LUI");
-
-      pr_id_ex.wbcs.RegDst = RegDst_rt;
-      pr_id_ex.wbcs.RegWrite = RegWrite_yes;
-      pr_id_ex.ecs.ALUSrc = ALUSrc_immediate;
-
+      template_itype_instruction();
       set_alu_op(ALUOp_LUI);
-
-      disable_memory();
-
-      pr_id_ex.wbcs.MemToReg = MemToReg_ALU_result;
     }
-
-
     break; case LW: // Load word
     {
       dprint("Decoded: %s\n", "LW");
@@ -1006,6 +885,7 @@ void process_instruction()
     // Check if decode is causes data hazard.
     if (has_dependency())
     {
+      printf("HEY IM RUNNING DECODE, DEPENDENCY!\n");
       // Avoid overwriting!!
       // We are stalling decode so we also have to stall fetch!
       status.fetch = STATUS_STALL;
@@ -1019,6 +899,7 @@ void process_instruction()
     }
     else
     {
+      printf("HEY IM RUNNING DECODE!\n");
       log_history(decode, 'd');
       decode_count++;
       status.fetch = STATUS_READY;
