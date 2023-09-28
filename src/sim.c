@@ -144,6 +144,26 @@ void handle_rtype(u8 op)
     {
       pr_id_ex.ecs.ALUOp = ALUOp_ADD;
     }
+    break; case AND:
+    {
+      pr_id_ex.ecs.ALUOp = ALUOp_AND;
+    }
+    break; case OR:
+    {
+      pr_id_ex.ecs.ALUOp = ALUOp_OR;
+    }
+    break; case XOR:
+    {
+      pr_id_ex.ecs.ALUOp = ALUOp_XOR;
+    }
+    break; case SLT:
+    {
+      pr_id_ex.ecs.ALUOp = ALUOp_SLT;
+    }
+    break; case NOR:
+    {
+      pr_id_ex.ecs.ALUOp = ALUOp_NOR;
+    }
     break; case SUB:
            case SUBU:
     {
@@ -683,6 +703,10 @@ void execute_alu()
     {
       dprint("ALU ADD: %u + %u = %u\n", operand_a(), operand_b(), operand_a() + operand_b());
       set_alu_result(operand_a() + operand_b());
+    }
+    break; case ALUOp_NOR: 
+    {
+      set_alu_result(NOR_OP(operand_a(), operand_b()));
     }
     break; case ALUOp_SLL: 
     {
