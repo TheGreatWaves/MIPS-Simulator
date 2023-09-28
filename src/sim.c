@@ -158,6 +158,20 @@ void handle_rtype(u8 op)
 
       pr_id_ex.ecs.ALUOp = ALUOp_MULTU;
     }
+    break; case DIV:
+    {
+      REG_STATUS[R_HI] = REG_NOT_READY;
+      REG_STATUS[R_LO] = REG_NOT_READY;
+
+      pr_id_ex.ecs.ALUOp = ALUOp_DIV;
+    }
+    break; case DIVU:
+    {
+      REG_STATUS[R_HI] = REG_NOT_READY;
+      REG_STATUS[R_LO] = REG_NOT_READY;
+
+      pr_id_ex.ecs.ALUOp = ALUOp_DIVU;
+    }
     break; case AND:
     {
       pr_id_ex.ecs.ALUOp = ALUOp_AND;
@@ -768,6 +782,30 @@ void execute_alu()
 
       dprint("LO: %x\n", CURRENT_STATE.LO);
       dprint("HI: %x\n", CURRENT_STATE.HI);
+
+      REG_STATUS[R_HI] = REG_READY;
+      REG_STATUS[R_LO] = REG_READY;
+    }
+    break; case ALUOp_DIV:
+    {
+      s32 numerator   = cast(s32, operand_a());
+      s32 denominator = cast(s32, operand_b());
+      if (denominator != 0) {
+        CURRENT_STATE.LO = u32t(numerator / denominator);
+        CURRENT_STATE.HI = u32t(numerator % denominator);
+      }
+
+      REG_STATUS[R_HI] = REG_READY;
+      REG_STATUS[R_LO] = REG_READY;
+    }
+    break; case ALUOp_DIVU:
+    {
+      u32 numerator   = operand_a();
+      u32 denominator = operand_b();
+      if (denominator != 0) {
+        CURRENT_STATE.LO = u32t(numerator / denominator);
+        CURRENT_STATE.HI = u32t(numerator % denominator);
+      }
 
       REG_STATUS[R_HI] = REG_READY;
       REG_STATUS[R_LO] = REG_READY;
