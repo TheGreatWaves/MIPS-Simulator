@@ -1,5 +1,6 @@
 #include "shell.h"
 #include "uninspiring_macros.h"
+#include "utils.h"
 #include <stdio.h>
 #include <stdbool.h>
 
@@ -35,13 +36,15 @@ typedef struct {
 } ExecuteControlSignals;
 
 typedef struct {
-  u32 MemRead:  1;
-  u32 MemWrite: 1;
+  u32 MemRead:    1;
+  u32 MemWrite:   1;
+  u32 LoadSz:     2;
+  u32 SignExtend: 1;
 } MemoryControlSignals;
 
 typedef struct {
   u32 RegWrite: 1;
-  u32 RegDst: 1;
+  u32 RegDst:   1;
   u32 MemToReg: 1;
   u32 PCSrc:    2; 
 } WriteBackControlSignals;
@@ -288,14 +291,16 @@ inline void set_register_dependency()
 
 inline void reset_control_signals()
 {
-  pr_id_ex.ecs.ALUOp = 0;
+  pr_id_ex.ecs.ALUOp  = 0;
   pr_id_ex.ecs.ALUSrc = 0;
 
-  pr_id_ex.mcs.MemRead = 0;
-  pr_id_ex.mcs.MemWrite = 0;
-
-  pr_id_ex.wbcs.PCSrc = 0;
-  pr_id_ex.wbcs.RegDst = 0;
+  pr_id_ex.mcs.MemRead    = 0;
+  pr_id_ex.mcs.MemWrite   = 0;
+  pr_id_ex.mcs.LoadSz     = 0;
+  pr_id_ex.mcs.SignExtend = 0;
+ 
+  pr_id_ex.wbcs.PCSrc    = 0;
+  pr_id_ex.wbcs.RegDst   = 0;
   pr_id_ex.wbcs.RegWrite = 0;
   pr_id_ex.wbcs.MemToReg = 0;
 }
@@ -325,6 +330,35 @@ inline void retrieve_values()
 
   u32 jump_offset = GET_BLOCK(pr_id_ex.imm, 0, 26);
   pr_id_ex.ja = (jump_offset << 2);
+}
+
+
+/////////////////////////////////////
+// NOTE(Appy): Templates
+
+inline void template_load_instruction()
+{
+  // We need to read the data (load!)
+  enable_memory_r();
+
+  pr_id_ex.wbcs.RegDst = RegDst_rt;
+  pr_id_ex.wbcs.RegWrite = RegWrite_yes;
+
+  pr_id_ex.ecs.ALUSrc = ALUSrc_immediate;
+  pr_id_ex.ecs.ALUOp = ALUOp_ADD;
+
+  pr_id_ex.wbcs.MemToReg = MemToReg_memory_data;
+}
+
+inline void template_store_instruction()
+{
+  // We need to write the data.
+  enable_memory_w();
+
+  pr_id_ex.wbcs.RegWrite = RegWrite_no;
+
+  pr_id_ex.ecs.ALUSrc = ALUSrc_immediate;
+  pr_id_ex.ecs.ALUOp = ALUOp_ADD;
 }
 
 PIPE_LINE_STAGE void decode()
@@ -432,32 +466,54 @@ PIPE_LINE_STAGE void decode()
     break; case LW: // Load word
     {
       dprint("Decoded: %s\n", "LW");
-      // We need to read the data (load!)
-      enable_memory_r();
-
-      pr_id_ex.wbcs.RegDst = RegDst_rt;
-      pr_id_ex.wbcs.RegWrite = RegWrite_yes;
-
-      pr_id_ex.ecs.ALUSrc = ALUSrc_immediate;
-      pr_id_ex.ecs.ALUOp = ALUOp_ADD;
-
-      pr_id_ex.wbcs.MemToReg = MemToReg_memory_data;
+      template_load_instruction();
+      pr_id_ex.mcs.LoadSz = LoadSz_word;
+    }
+    break; case LH: // Load half word
+    {
+      dprint("Decoded: %s\n", "LH");
+      template_load_instruction();
+      pr_id_ex.mcs.LoadSz = LoadSz_half;
+      pr_id_ex.mcs.SignExtend = SignExtend_yes;
+    }
+    break; case LB: // Load half word
+    {
+      dprint("Decoded: %s\n", "LB");
+      template_load_instruction();
+      pr_id_ex.mcs.LoadSz = LoadSz_byte;
+      pr_id_ex.mcs.SignExtend = SignExtend_yes;
+    }
+    break; case LHU: // Load half word
+    {
+      dprint("Decoded: %s\n", "LHU");
+      template_load_instruction();
+      pr_id_ex.mcs.LoadSz = LoadSz_half;
+      pr_id_ex.mcs.SignExtend = SignExtend_no;
+    }
+    break; case LBU: // Load half word
+    {
+      dprint("Decoded: %s\n", "LBU");
+      template_load_instruction();
+      pr_id_ex.mcs.LoadSz = LoadSz_byte;
+      pr_id_ex.mcs.SignExtend = SignExtend_no;
     }
     break; case SW:
     {
       dprint("Decoded: %s\n", "SW");
-
-      // We need to write the data.
-      enable_memory_w();
-
-      // Do not write to register.
-      pr_id_ex.wbcs.RegWrite = RegWrite_no;
-
-      // Selects the immediate as the 2nd operand.
-      pr_id_ex.ecs.ALUSrc = ALUSrc_immediate;
-
-      // Compute base + offset
-      pr_id_ex.ecs.ALUOp = ALUOp_ADD;
+      template_store_instruction();
+      pr_id_ex.mcs.LoadSz = LoadSz_word;
+    }
+    break; case SH:
+    {
+      dprint("Decoded: %s\n", "SH");
+      template_store_instruction();
+      pr_id_ex.mcs.LoadSz = LoadSz_half;
+    }
+    break; case SB:
+    {
+      dprint("Decoded: %s\n", "SB");
+      template_store_instruction();
+      pr_id_ex.mcs.LoadSz = LoadSz_byte;
     }
   }
 
@@ -788,14 +844,55 @@ PIPE_LINE_STAGE void memory()
   if (pr_ex_mem.mcs.MemRead) 
   {
     // The ALU computes the (base + offset)
-    pr_ex_mem.mem_res = mem_read_32(pr_ex_mem.alu_res);
-    dprint("Loaded: %u\n", mem_read_32(pr_ex_mem.alu_res));
+    u32 data = mem_read_32(pr_ex_mem.alu_res);
+
+    switch (pr_ex_mem.mcs.LoadSz) 
+    {
+      break; case LoadSz_half:
+      {
+        data = GET_BLOCK(data, 0, WORD);
+
+        if (pr_ex_mem.mcs.SignExtend == SignExtend_yes)
+        {
+          data = sign_extend_16(data);
+        }
+      }
+      break; case LoadSz_byte:
+      {
+        data = GET_BLOCK(data, 0, BYTE);
+
+        if (pr_ex_mem.mcs.SignExtend == SignExtend_yes)
+        {
+          data = sign_extend_8(data);
+        }
+      }
+    }
+    pr_ex_mem.mem_res = data;
+    dprint("Loaded: 0x%x\n", pr_ex_mem.mem_res);
   }
 
   if (pr_ex_mem.mcs.MemWrite)
   {
-    mem_write_32(pr_ex_mem.alu_res, pr_ex_mem.rtv);
-    dprint("Stored: %u at 0x%x\n", pr_ex_mem.rtv, pr_ex_mem.alu_res);
+    u32 data = pr_ex_mem.rtv;
+
+    switch (pr_ex_mem.mcs.LoadSz) 
+    {
+      break; case LoadSz_word:
+      {
+        mem_write_32(pr_ex_mem.alu_res, data);
+      }
+      break; case LoadSz_half:
+      {
+        data = GET_BLOCK(data, 0, WORD);
+        mem_write_32(pr_ex_mem.alu_res, data);
+      }
+      break; case LoadSz_byte:
+      {
+        data = GET_BLOCK(data, 0, BYTE);
+        mem_write_32(pr_ex_mem.alu_res, data);
+      }
+    }
+    dprint("Stored: %u at 0x%x\n", data, pr_ex_mem.alu_res);
   }
 
   if (pr_ex_mem.mcs.MemRead == MemRead_no && pr_ex_mem.mcs.MemWrite == MemWrite_no)

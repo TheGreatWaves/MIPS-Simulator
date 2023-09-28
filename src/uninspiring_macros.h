@@ -9,7 +9,7 @@
 /////////////////////////////////////
 // NOTE(Appy): Sizes
 
-#define BYTE  08
+#define BYTE   8
 #define WORD  16
 #define DWORD 32
 
@@ -196,6 +196,13 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define PCSrc_normal 0
 #define PCSrc_branch 1
 #define PCSrc_jump 2
+
+#define LoadSz_word 0
+#define LoadSz_half 1
+#define LoadSz_byte 2
+
+#define SignExtend_no 0
+#define SignExtend_yes 1
 
 #define ALUOp_NOOP 0
 #define ALUOp_ADD 1
