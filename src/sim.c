@@ -1,6 +1,13 @@
+#include <stdio.h>
 #include "shell.h"
 #include "uninspiring_macros.h"
-#include <stdio.h>
+
+
+/////////////////////////////////////
+// NOTE(Appy): Sign extension
+
+MAKE_SIGN_EXTEND(16)
+MAKE_SIGN_EXTEND(8)
 
 /////////////////////////////////////
 // NOTE(Appy): Registers
@@ -9,7 +16,8 @@
 #define R_RA 31
 
 /////////////////////////////////////
-// NOTE(Appy): Handlers
+// NOTE(Appy): Handlers, basically where the code goes
+//             when the first few bits denotes SPECIAL or REGIMM
 
 HANDLER(REGIMM) {
   u8 op = GET_BLOCK(INSTRUCTION_REGISTER, 16, 5);
@@ -231,7 +239,8 @@ HANDLER(SPECIAL) {
 #undef SA
 }
 
-void process_instruction() {
+void process_instruction() 
+{
   /* Instruction jump tables */
   static const void *jumpTable[] = {OPCODES(MK_LBL) MK_LBL(NEXT_STATE)};
 

@@ -9,9 +9,12 @@
 /////////////////////////////////////
 // NOTE(Appy): Sizes
 
-#define BYTE  08
+#define BYTE   8
 #define WORD  16
 #define DWORD 32
+
+/////////////////////////////////////
+// NOTE(Appy): Illegal macro helpers
 
 #define CAT(x, s) x##s
 #define CAT_HELPER(x, s) CAT(x, s)
@@ -167,10 +170,5 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define JUMPTABLE static const void *jumpTable[]
 #define MK_LBL(OP) &&lbl_##OP,
 #define LBL(OP) lbl_##OP
-
-/////////////////////////////////////
-// NOTE(Appy): Helper Labels, used for organization.
-
-#define PIPELINE
 
 #endif /* APPY_SACRILEGIOUS_MACROS */

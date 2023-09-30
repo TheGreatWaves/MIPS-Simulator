@@ -12,8 +12,8 @@
 
 /////////////////////////////////////
 // NOTE(Appy): Type casting
-#define     cast(t,v) ((t)(v))
-#define  cast_void(v) cast(void,(v)) 
+#define cast(t,v) ((t)(v))
+#define cast_void(v) cast(void,(v)) 
 #define cast_voidp(v) cast(void*,(v)) 
 #define u32t(V) (cast(uint32_t, V))
 
@@ -71,8 +71,5 @@ inline u8 count_set_bits(u32 n)
 }
 
 #define MAKE_SIGN_EXTEND(sz) static u32 sign_extend_##sz(uint32_t n) { if ((n >> (sz - 1)) & 1) { n = n | MASK1((32 - sz), sz); } return n; }
-
-MAKE_SIGN_EXTEND(16)
-MAKE_SIGN_EXTEND(8)
 
 #endif // BASE_UTILS
