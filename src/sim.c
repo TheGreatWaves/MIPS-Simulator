@@ -267,8 +267,6 @@ void handle_rtype(u8 op)
       pr_id_ex.rsv = 4;
       pr_id_ex.rtv = pr_id_ex.pc;
 
-      pr_id_ex.rdi = 31;
-
       // Stall fetch and decode.
       status.fetch = STATUS_STALL;
       status.decode = STATUS_STALL;
@@ -676,7 +674,7 @@ inline void choose_register_destination()
   // RegDist:
   //  0: $rt
   //  1: $rd
-  pr_ex_mem.rd = (pr_id_ex.wbcs.RegDst == 0) 
+  pr_ex_mem.rd = (pr_id_ex.wbcs.RegDst == RegDst_rt) 
                   ? pr_id_ex.rti 
                   : pr_id_ex.rdi;
 
