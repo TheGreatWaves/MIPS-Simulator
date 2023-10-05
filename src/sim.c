@@ -368,7 +368,7 @@ inline void retrieve_values()
   // Indiscriminately sign extend the 16 bits immediate and store it.
   pr_id_ex.imm = sign_extend_16(u32t(GET(IM, pr_if_id.instruction)));
 
-  u32 jump_offset = GET_BLOCK(pr_id_ex.imm, 0, 26);
+  u32 jump_offset = GET_BLOCK(pr_if_id.instruction, 0, 26);
   pr_id_ex.ja = (jump_offset << 2);
 }
 
@@ -516,8 +516,6 @@ PIPE_LINE_STAGE void decode()
 
       pr_id_ex.wbcs.PCSrc = PCSrc_jump; 
 
-      pr_id_ex.ja = (pr_id_ex.pc & 0xffff0000) | (pr_id_ex.imm << 2);
-
       // Stall fetch and decode.
       status.fetch = STATUS_STALL;
       status.decode = STATUS_STALL;
@@ -528,8 +526,6 @@ PIPE_LINE_STAGE void decode()
       dprint("Decoded: %s\n", "J");
 
       pr_id_ex.wbcs.PCSrc = PCSrc_jump; 
-
-      pr_id_ex.ja = (pr_id_ex.pc & 0xffff0000) | (pr_id_ex.imm << 2);
 
       link_next_pc();
 
