@@ -348,16 +348,17 @@ bool has_dependency()
   // One of the registers we're reading from is not ready.
   u8 rti = GET(RT, pr_if_id.instruction);
   u8 rsi = GET(RS, pr_if_id.instruction);
+
+  dprint("Reading register rti: %d\n", rti);
+  dprint("Reading register rsi: %d\n", rsi);
   
-  bool rt_not_ready = (REG_STATUS[rti] == REG_NOT_READY);
-  bool rs_not_ready = (REG_STATUS[rsi] == REG_NOT_READY);
+  bool rt_not_ready = (pr_ex_mem.wbcs.RegWrite == RegWrite_yes &&  rti == pr_ex_mem.rd) || (pr_mem_wb.wbcs.RegWrite == RegWrite_yes && rti == pr_mem_wb.rd);
+  bool rs_not_ready = (pr_ex_mem.wbcs.RegWrite == RegWrite_yes &&  rsi == pr_ex_mem.rd) || (pr_mem_wb.wbcs.RegWrite == RegWrite_yes && rsi == pr_mem_wb.rd);
   bool rt_rs_same = (rti == rsi);
   bool both_not_ready = (rt_not_ready && rs_not_ready);
 
   // We consider it forward-able if the execute writes to register and has no business with memory.
   bool forward_able = (pr_id_ex.wbcs.RegWrite == RegWrite_yes && pr_id_ex.mcs.MemRead == MemRead_no);
-
-  dprint("Both is not ready: %d\n", both_not_ready);
 
   // Everything below this is forward-able, no need to wait for writeback.
   if (forward_able)
@@ -1330,7 +1331,8 @@ inline void set_register_ready()
     status.decode = STATUS_READY;
   }
 
-  REG_STATUS[pr_mem_wb.rd] = true;
+  dprint("Setting register %d to ready\n", pr_mem_wb.rd);
+  REG_STATUS[pr_mem_wb.rd] = REG_READY;
 }
 
 PIPE_LINE_STAGE void writeback()

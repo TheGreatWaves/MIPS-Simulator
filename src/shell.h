@@ -29,7 +29,7 @@
 // #define ALLOW_PIPELINE_HISTORY
 
 // Assume max cycle is 100 (Too much to fit on screen)
-#define MAX_CYCLES 4000
+#define MAX_CYCLES 5000
 #define HISTORY_LINE_LENGTH MAX_CYCLES
 #define HISTORY_MAX_LINES 20
 #define HISTORY_BUFFER_SIZE HISTORY_LINE_LENGTH * HISTORY_MAX_LINES
