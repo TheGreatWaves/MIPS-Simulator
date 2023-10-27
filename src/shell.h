@@ -26,12 +26,12 @@
 
 #define MIPS_REGS 32
 
-#define ALLOW_PIPELINE_HISTORY
+// #define ALLOW_PIPELINE_HISTORY
 
 // Assume max cycle is 100 (Too much to fit on screen)
-#define MAX_CYCLES 500
+#define MAX_CYCLES 4000
 #define HISTORY_LINE_LENGTH MAX_CYCLES
-#define HISTORY_MAX_LINES 200
+#define HISTORY_MAX_LINES 20
 #define HISTORY_BUFFER_SIZE HISTORY_LINE_LENGTH * HISTORY_MAX_LINES
 extern char pipeline_history[HISTORY_BUFFER_SIZE];
 extern u32 fetch_count;
@@ -39,6 +39,10 @@ extern u32 decode_count;
 extern u32 execute_count;
 extern u32 memory_count;
 extern u32 writeback_count;
+
+extern u32 alu_result_to_forward;
+
+extern u32 cycles_padding;
 
 typedef struct CPU_State_Struct {
 
@@ -143,6 +147,8 @@ PIPE_LINE_REGISTER typedef struct {
   /* Register values */
   u32 rsv;   // REGS[$RS] 
   u32 rtv;   // REGS[$RT]
+
+  u8 forwarded;
 
   /* Control Signals */
   ExecuteControlSignals   ecs;

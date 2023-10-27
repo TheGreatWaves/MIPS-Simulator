@@ -231,5 +231,11 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define ALUOp_MULTU 22
 #define ALUOp_DIV 23
 #define ALUOp_DIVU 24
+#define ALUOp_SYSCALL 25
+
+#define forwarded_none 0
+#define forwarded_rt 1
+#define forwarded_rs 2
+#define forwarded_both 3
 
 #endif /* APPY_SACRILEGIOUS_MACROS */

@@ -324,178 +324,178 @@ test_div_pos:
         bne $t2, $t1, inf
         jal reset
 test_div_neg:
-        addi $t0, $t0, 421
-        addi $t1, $t1, -107
-        div $t0, $t1
+addi $t0, $t0, 421
+addi $t1, $t1, -107
+div $t0, $t1
  
-        mflo $t2
-        addi $t1, $zero, 0
-        lui $t1, 0xffff
-        ori $t1, $t1, 0xfffd
-        bne $t2, $t1, inf
+mflo $t2
+addi $t1, $zero, 0
+lui $t1, 0xffff
+ori $t1, $t1, 0xfffd
+bne $t2, $t1, inf
  
-        mfhi $t3
-        addi $t0, $zero, 0x64
-        bne $t3, $t0, inf
-        jal reset
+mfhi $t3
+addi $t0, $zero, 0x64
+bne $t3, $t0, inf
+jal reset
 test_divu_pos:
-        ori $t0, $t0, 421
-        ori $t1, $t1, 107
-        divu $t0, $t1
-        mfhi $t2
-        mflo $t3
-        addi $t0, $zero, 3
-        ori $t1, $zero, 0x64
-        bne $t3, $t0, inf
-        bne $t2, $t1, inf
-        jal reset
+ori $t0, $t0, 421
+ori $t1, $t1, 107
+divu $t0, $t1
+mfhi $t2
+mflo $t3
+addi $t0, $zero, 3
+ori $t1, $zero, 0x64
+bne $t3, $t0, inf
+bne $t2, $t1, inf
+jal reset
 test_divu_neg:
-        ori $t0, $t0, 421
-        addi $t1, $t1, -107
-        divu $t0, $t1
-        mfhi $t2
-        mflo $t3
-        addi $t0, $zero, 3
-        bne $t3, $zero, inf
-        ori $t1, $zero, 0x1a5
-        bne $t2, $t1, inf
-        jal reset
+ori $t0, $t0, 421
+addi $t1, $t1, -107
+divu $t0, $t1
+mfhi $t2
+mflo $t3
+addi $t0, $zero, 3
+bne $t3, $zero, inf
+ori $t1, $zero, 0x1a5
+bne $t2, $t1, inf
+jal reset
 test_slt0:
-        addi $t0, $zero, -1           # t0 = -1
-        addi $t2, $zero, -1           # t2 = -1
-        slt $t1, $t0, $t2             # t1 = 0 
-        bne $t1, $zero, inf   
-        jal reset
+addi $t0, $zero, -1           # t0 = -1
+addi $t2, $zero, -1           # t2 = -1
+slt $t1, $t0, $t2             # t1 = 0 
+bne $t1, $zero, inf   
+jal reset
 test_slt1:
-        addi $t0, $zero, -1           # t0 = -1
-        addi $t2, $zero, 1            # t2 = 1
-        slt $t1, $t0, $t2             # t1 = 1 
-        beq $t1, $zero, inf   
-        jal reset
+addi $t0, $zero, -1           # t0 = -1
+addi $t2, $zero, 1            # t2 = 1
+slt $t1, $t0, $t2             # t1 = 1 
+beq $t1, $zero, inf   
+jal reset
 test_sltu0:
-        addi $t0, $zero, -1           # t0 = -1
-        addi $t2, $zero, 1            # t2 = 1
-        sltu $t1, $t0, $t2            # t1 = 0 
-        bne $t1, $zero, inf
-        jal reset
+addi $t0, $zero, -1           # t0 = -1
+addi $t2, $zero, 1            # t2 = 1
+sltu $t1, $t0, $t2            # t1 = 0 
+bne $t1, $zero, inf
+jal reset
 test_sltu1:
-        addi $t0, $zero, -1           # t0 = -1
-        addi $t2, $zero, -2           # t2 = 1
-        sltu $t1, $t2, $t1            # t1 = 1
-        bne $t1, $zero, inf   
-        jal reset
+addi $t0, $zero, -1           # t0 = -1
+addi $t2, $zero, -2           # t2 = 1
+sltu $t1, $t2, $t1            # t1 = 1
+bne $t1, $zero, inf   
+jal reset
 test_slti0:
-        addi $t0, $zero, -1           # t0 = -1
-        slti $t1, $t0, -1             # t1 = 0 
-        bne $t1, $zero, inf   
-        jal reset
+addi $t0, $zero, -1           # t0 = -1
+slti $t1, $t0, -1             # t1 = 0 
+bne $t1, $zero, inf   
+jal reset
 
-        addi $t0, $zero, -1           # t0 = -1
-        slti $t1, $t0, 1              # t1 = 1 
-        beq $t1, $zero, inf           # if t1 == 0, fail
-        jal reset
+addi $t0, $zero, -1           # t0 = -1
+slti $t1, $t0, 1              # t1 = 1 
+beq $t1, $zero, inf           # if t1 == 0, fail
+jal reset
 test_lui:
-        lui $t0, 0xffff
-        ori $t0, $t0, 0xffff
-        addi $t1, $t1, -1
-        bne $t0, $t1, inf
-        jal reset
+lui $t0, 0xffff
+ori $t0, $t0, 0xffff
+addi $t1, $t1, -1
+bne $t0, $t1, inf
+jal reset
 test_sltiu0:
-        addi $t0, $zero, -1           # t0 = -1
-        sltiu $t1, $t0, 1             # t1 = 0 
-        bne $t1, $zero, inf   
-        jal reset
+addi $t0, $zero, -1           # t0 = -1
+sltiu $t1, $t0, 1             # t1 = 0 
+bne $t1, $zero, inf   
+jal reset
 test_sltiu1:
-        addi $t0, $zero, 1            # t0 = 1
-        sltiu $t1, $t0, -1            # t1 = 0
-        addi $t2, $zero, 1
-        bne $t1, $t2, inf   
-        jal reset
+addi $t0, $zero, 1            # t0 = 1
+sltiu $t1, $t0, -1            # t1 = 0
+addi $t2, $zero, 1
+bne $t1, $t2, inf   
+jal reset
 test_srlv:
-        lui $t3, 0x1fff
-        ori $t3, 0xfff3
-        addi $t0, $zero, -100         # t0 -> -100
-        addi $t1, $zero, 35           # t1 -> 35
-        srlv $t2, $t0, $t1            # t2 -> (-100) >> 3
-        bne $t2, $t3, inf    
-        jal reset
+lui $t3, 0x1fff
+ori $t3, 0xfff3
+addi $t0, $zero, -100         # t0 -> -100
+addi $t1, $zero, 35           # t1 -> 35
+srlv $t2, $t0, $t1            # t2 -> (-100) >> 3
+bne $t2, $t3, inf    
+jal reset
 test_srav:
-        addi $t3,  $zero, -13         # t3 -> -13
-        addi $t0,  $zero, -100        # t0 -> -100
-        addi $t1,  $zero, 35          # t1 -> 35
-        srav $t2,  $t0, $t1           # t2 -> (-100) >> 3
-        bne $t2,  $t3, inf            # Jump to exit if $t2 = -13
-        jal reset
+addi $t3,  $zero, -13         # t3 -> -13
+addi $t0,  $zero, -100        # t0 -> -100
+addi $t1,  $zero, 35          # t1 -> 35
+srav $t2,  $t0, $t1           # t2 -> (-100) >> 3
+bne $t2,  $t3, inf            # Jump to exit if $t2 = -13
+jal reset
 test_sll:
-        addi $t0, $zero, 1            # t0 = 1
-        addi $t1, $zero, 8            # t1 = 8
-        sll $t2, $t0, 3               # t2 = 8
-        bne $t2, $t1, inf
-        jal reset
+addi $t0, $zero, 1            # t0 = 1
+addi $t1, $zero, 8            # t1 = 8
+sll $t2, $t0, 3               # t2 = 8
+bne $t2, $t1, inf
+jal reset
 test_sllv:
-        addi $t0,  $zero, 35          # t0
-        addi $t1,  $zero, 1           # t0
-        sllv $t3,  $t1  , $t0         # t3 = 8
-        addi $t3,  $t3  , 2
-        addi $t2,  $zero, 10
-        bne  $t2,  $t3  , inf
-        jal reset
+addi $t0,  $zero, 35          # t0
+addi $t1,  $zero, 1           # t0
+sllv $t3,  $t1  , $t0         # t3 = 8
+addi $t3,  $t3  , 2
+addi $t2,  $zero, 10
+bne  $t2,  $t3  , inf
+jal reset
 test_srl:
-        addi $t0, $zero, 32           # t0 = 1
-        srl $t2, $t0, 2               # v0 = 8
-        addi $t1, $zero, 8
-        bne $t1, $t2, inf
-        jal reset
+addi $t0, $zero, 32           # t0 = 1
+srl $t2, $t0, 2               # v0 = 8
+addi $t1, $zero, 8
+bne $t1, $t2, inf
+jal reset
 test_jalr:
-        addi $t3, $zero, 5
-        jal jump_label_1
-        jal jump_label_2
-        j jump_exit_label
+addi $t3, $zero, 5
+jal jump_label_1
+jal jump_label_2
+j jump_exit_label
 jump_label_1:
-        add $t0, $zero, $ra
-        beq $t2, $t3, jump_okay
-        jr $ra
+add $t0, $zero, $ra
+beq $t2, $t3, jump_okay
+jr $ra
 jump_label_2:
-        jr $ra
+jr $ra
 jump_exit_label:
-        addi $t1, $t1, 4
-        sub $ra, $ra, $t1
-        bne $ra, $t0, inf
-        addi $t2, $zero, 5
-        addi $t0, $t0, 8
-        jalr $t0
+addi $t1, $t1, 4
+sub $ra, $ra, $t1
+bne $ra, $t0, inf
+addi $t2, $zero, 5
+addi $t0, $t0, 8
+jalr $t0
 jump_okay:
-        jal reset
+jal reset
 test_blez_not_taken:
-        addi $t0, $zero, 100
-        blez $t0, inf
-        j blez_done
+addi $t0, $zero, 100
+blez $t0, inf
+j blez_done
 blez_done:
-        jal reset
+jal reset
 test_blez_taken_1:
-	blez $t0 blez_take_zero
-	j inf
+blez $t0 blez_take_zero
+j inf
 blez_take_zero:
-	jal reset
+jal reset
 test_blez_taken_2:
-	addi $t0, $zero, -25
-	blez $t0 blez_take_neg
-	j inf
+addi $t0, $zero, -25
+blez $t0 blez_take_neg
+j inf
 blez_take_neg:
-	jal reset
+jal reset
 test_bgtz_not_taken:
-        bgtz $t0, inf
-        jal reset
+bgtz $t0, inf
+jal reset
 test_bgtz_taken_1:
-	addi $t0, $zero, 5
-	bgtz $t0 bgtz_take_5
-	j inf
+addi $t0, $zero, 5
+bgtz $t0 bgtz_take_5
+j inf
 bgtz_take_5:
-	jal reset
+jal reset
 test_bgtz_not_taken_2:
-	addi $t0, $zero, -1
-        bgtz $t0, inf
-        jal reset
+addi $t0, $zero, -1
+bgtz $t0, inf
+jal reset
 test_bltzal_take:
 	addi $t0, $zero, -1
 	add $t1, $zero, $ra       # Record the return address.
@@ -769,245 +769,245 @@ test_sh_offset_fourth:
 	sh $zero, 0($3)
 	jal reset
 test_lb:
-	lui $3, 0x1000
+lui $3, 0x1000
 
-	# Set values
-	ori $t0, $zero, 0xabcd
-	lui $t2, 0xffff
-	ori $t2, $t2, 0xffcd
+# Set values
+ori $t0, $zero, 0xabcd
+lui $t2, 0xffff
+ori $t2, $t2, 0xffcd
 
-	# Save in memory
-	sw $t0, 0($3)
+# Save in memory
+sw $t0, 0($3)
 
-	# Load data back into $t1
-	lb $t1, 0($3)
+# Load data back into $t1
+lb $t1, 0($3)
 
-	# Should be the same
-	bne $t1, $t2, inf
-	sw $zero, 0($3)
-	jal reset
+# Should be the same
+bne $t1, $t2, inf
+sw $zero, 0($3)
+jal reset
 test_lb_none:
-	lui $3, 0x1000
+lui $3, 0x1000
 
-	# Set values
-	ori $t0, $zero, 0xab00
+# Set values
+ori $t0, $zero, 0xab00
 
-	# Save in memory
-	sw $t0, 0($3)
+# Save in memory
+sw $t0, 0($3)
 
-	# Load data back into $t1
-	lb $t1, 0($3)
+# Load data back into $t1
+lb $t1, 0($3)
 
-	# Should be the same
-	bne $t1, $t2, inf
-	sw $zero, 0($3)
-	jal reset
+# Should be the same
+bne $t1, $t2, inf
+sw $zero, 0($3)
+jal reset
 test_lb_shift:
-	lui $3, 0x1000
+lui $3, 0x1000
 
-	# Set values
-	ori $t0, $zero, 0xabcd
-	lui $t2, 0xffff
-	ori $t2, $t2, 0xffab
+# Set values
+ori $t0, $zero, 0xabcd
+lui $t2, 0xffff
+ori $t2, $t2, 0xffab
 
-	# Save in memory
-	sw $t0, 0($3)
+# Save in memory
+sw $t0, 0($3)
 
-	# Load data back into $t1
-	lb $t1, 1($3)
+# Load data back into $t1
+lb $t1, 1($3)
 
-	# Should be the same
-	bne $t1, $t2, inf
-	sw $zero, 0($3)
-	jal reset
+# Should be the same
+bne $t1, $t2, inf
+sw $zero, 0($3)
+jal reset
 test_lbu:
-	lui $3, 0x1000
+lui $3, 0x1000
 
-	# Set values
-	ori $t0, $zero, 0xabcd
-	ori $t2, $zero, 0x00cd
+# Set values
+ori $t0, $zero, 0xabcd
+ori $t2, $zero, 0x00cd
 
-	# Save in memory
-	sw $t0, 0($3)
+# Save in memory
+sw $t0, 0($3)
 
-	# Load data back into $t1
-	lbu $t1, 0($3)
+# Load data back into $t1
+lbu $t1, 0($3)
 
-	# Should be the same
-	bne $t1, $t2, inf
-	sw $zero, 0($3)
-	jal reset
+# Should be the same
+bne $t1, $t2, inf
+sw $zero, 0($3)
+jal reset
 test_lbu_none:
-	lui $3, 0x1000
+lui $3, 0x1000
 
-	# Set values
-	ori $t0, $zero, 0xab00
+# Set values
+ori $t0, $zero, 0xab00
 
-	# Save in memory
-	sw $t0, 0($3)
+# Save in memory
+sw $t0, 0($3)
 
-	# Load data back into $t1
-	lbu $t1, 0($3)
+# Load data back into $t1
+lbu $t1, 0($3)
 
-	# Should be the same
-	bne $t1, $t2, inf
-	sw $zero, 0($3)
-	jal reset
+# Should be the same
+bne $t1, $t2, inf
+sw $zero, 0($3)
+jal reset
 test_lbu_shift:
-	lui $3, 0x1000
+lui $3, 0x1000
 
-	# Set values
-	ori $t0, $zero, 0xabcd
-	ori $t2, $zero, 0xab
+# Set values
+ori $t0, $zero, 0xabcd
+ori $t2, $zero, 0xab
 
-	# Save in memory
-	sw $t0, 0($3)
+# Save in memory
+sw $t0, 0($3)
 
-	# Load data back into $t1
-	lbu $t1, 1($3)
+# Load data back into $t1
+lbu $t1, 1($3)
 
-	# Should be the same
-	bne $t1, $t2, inf
-	sw $zero, 0($3)
-	jal reset
+# Should be the same
+bne $t1, $t2, inf
+sw $zero, 0($3)
+jal reset
 test_lh:
-	lui $3, 0x1000
+lui $3, 0x1000
 
-	# Set values
-	ori $t0, $zero, 0xabcd
-	lui $t2, 0xffff
-	ori $t2, $t2, 0xabcd
+# Set values
+ori $t0, $zero, 0xabcd
+lui $t2, 0xffff
+ori $t2, $t2, 0xabcd
 
-	# Save in memory
-	sw $t0, 0($3)
+# Save in memory
+sw $t0, 0($3)
 
-	# Load data back into $t1
-	lh $t1, 0($3)
+# Load data back into $t1
+lh $t1, 0($3)
 
-	# Should be the same
-	bne $t1, $t2, inf
-	sw $zero, 0($3)
-	jal reset
+# Should be the same
+bne $t1, $t2, inf
+sw $zero, 0($3)
+jal reset
 test_lh_extend:
-	lui $3, 0x1000
+lui $3, 0x1000
 
-	# Set values
-	ori $t0, $zero, 0xab00
-	lui $t2, 0xffff
-	ori $t2, $t2, 0xab00
+# Set values
+ori $t0, $zero, 0xab00
+lui $t2, 0xffff
+ori $t2, $t2, 0xab00
 
-	# Save in memory
-	sw $t0, 0($3)
+# Save in memory
+sw $t0, 0($3)
 
-	# Load data back into $t1
-	lh $t1, 0($3)
+# Load data back into $t1
+lh $t1, 0($3)
 
-	# Should be the same
-	bne $t1, $t2, inf
-	sw $zero, 0($3)
-	jal reset
+# Should be the same
+bne $t1, $t2, inf
+sw $zero, 0($3)
+jal reset
 test_lh_no_extend:
-	lui $3, 0x1000
+lui $3, 0x1000
 
-	# Set values
-	ori $t0, $zero, 0x7b00
-	ori $t2, $zero, 0x7b00
+# Set values
+ori $t0, $zero, 0x7b00
+ori $t2, $zero, 0x7b00
 
-	# Save in memory
-	sw $t0, 0($3)
+# Save in memory
+sw $t0, 0($3)
 
-	# Load data back into $t1
-	lh $t1, 0($3)
+# Load data back into $t1
+lh $t1, 0($3)
 
-	# Should be the same
-	bne $t1, $t2, inf
-	sw $zero, 0($3)
-	jal reset
+# Should be the same
+bne $t1, $t2, inf
+sw $zero, 0($3)
+jal reset
 test_lh_shift:
-	lui $3, 0x1000
+lui $3, 0x1000
 
-	# Set values
-	ori $t0, $zero, 0xabcd
-	ori $t2, $t2, 0xab
+# Set values
+ori $t0, $zero, 0xabcd
+ori $t2, $t2, 0xab
 
-	# Save in memory
-	sw $t0, 0($3)
+# Save in memory
+sw $t0, 0($3)
 
-	# Load data back into $t1
-	lh $t1, 1($3)
+# Load data back into $t1
+lh $t1, 1($3)
 
-	# Should be the same
-	bne $t1, $t2, inf
-	sw $zero, 0($3)
-	jal reset
+# Should be the same
+bne $t1, $t2, inf
+sw $zero, 0($3)
+jal reset
 test_lhu:
-	lui $3, 0x1000
+lui $3, 0x1000
 
-	# Set values
-	ori $t0, $zero, 0xabcd
-	ori $t2, $t2, 0xabcd
+# Set values
+ori $t0, $zero, 0xabcd
+ori $t2, $t2, 0xabcd
 
-	# Save in memory
-	sw $t0, 0($3)
+# Save in memory
+sw $t0, 0($3)
 
-	# Load data back into $t1
-	lhu $t1, 0($3)
+# Load data back into $t1
+lhu $t1, 0($3)
 
-	# Should be the same
-	bne $t1, $t2, inf
-	sw $zero, 0($3)
-	jal reset
+# Should be the same
+bne $t1, $t2, inf
+sw $zero, 0($3)
+jal reset
 test_lhu_extend_ignored:
-	lui $3, 0x1000
+lui $3, 0x1000
 
-	# Set values
-	ori $t0, $zero, 0xab00
-	ori $t2, $t2, 0xab00
+# Set values
+ori $t0, $zero, 0xab00
+ori $t2, $t2, 0xab00
 
-	# Save in memory
-	sw $t0, 0($3)
+# Save in memory
+sw $t0, 0($3)
 
-	# Load data back into $t1
-	lhu $t1, 0($3)
+# Load data back into $t1
+lhu $t1, 0($3)
 
-	# Should be the same
-	bne $t1, $t2, inf
-	sw $zero, 0($3)
-	jal reset
+# Should be the same
+bne $t1, $t2, inf
+sw $zero, 0($3)
+jal reset
 test_lhu_no_extend:
-	lui $3, 0x1000
+lui $3, 0x1000
 
-	# Set values
-	ori $t0, $zero, 0x7b00
-	ori $t2, $zero, 0x7b00
+# Set values
+ori $t0, $zero, 0x7b00
+ori $t2, $zero, 0x7b00
 
-	# Save in memory
-	sw $t0, 0($3)
+# Save in memory
+sw $t0, 0($3)
 
-	# Load data back into $t1
-	lhu $t1, 0($3)
+# Load data back into $t1
+lhu $t1, 0($3)
 
-	# Should be the same
-	bne $t1, $t2, inf
-	sw $zero, 0($3)
-	jal reset
+# Should be the same
+bne $t1, $t2, inf
+sw $zero, 0($3)
+jal reset
 test_lhu_shift:
-	lui $3, 0x1000
+lui $3, 0x1000
 
-	# Set values
-	ori $t0, $zero, 0xabcd
-	ori $t2, $t2, 0xab
+# Set values
+ori $t0, $zero, 0xabcd
+ori $t2, $t2, 0xab
 
-	# Save in memory
-	sw $t0, 0($3)
+# Save in memory
+sw $t0, 0($3)
 
-	# Load data back into $t1
-	lhu $t1, 1($3)
+# Load data back into $t1
+lhu $t1, 1($3)
 
-	# Should be the same
-	bne $t1, $t2, inf
-	sw $zero, 0($3)
-	jal reset
+# Should be the same
+bne $t1, $t2, inf
+sw $zero, 0($3)
+jal reset
 done:
         j exit
 inf:

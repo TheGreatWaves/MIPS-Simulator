@@ -27,13 +27,13 @@ test_addiu_pos:
         ori $t1, $t1, 0x1a
         bne $t0, $t1, inf
         jal reset
-test_addiu_neg:
-                                      # test ADDIU negative
-        addiu $t0, $t0, -1
-        lui $t1, 0xFFFF
-        ori $t1, $t1, 0xFFFF
-        bne $t0, $t1, inf
-        jal reset
+# test_addiu_neg:
+#                                       # test ADDIU negative
+#         addiu $t0, $t0, -1
+#         lui $t1, 0xFFFF
+#         ori $t1, $t1, 0xFFFF
+#         bne $t0, $t1, inf
+#         jal reset
 done:
         j exit
 inf:

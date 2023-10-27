@@ -104,79 +104,79 @@ test_sub:
          ori $t4, $t4, 0xFB
          subu $t8, $t3, $t4
          jal reset
-# test_subu_neg:
-#                                       # test subu (neg result)
-#         ori $t0, $t0, 0x0
-#         ori $t1, $t1, 0x4
-#         subu $t3, $t0, $t1
-#         lui $t4, 0xFFFF
-#         ori $t4, $t4, 0xFFFC
-#         bne $t3, $t4, inf
-#         jal reset
-# test_subu_neg_1:
-#                                       # test subu (neg result)
-#         ori $t0, $t0, 0x4
-#         ori $t1, $t1, 0x0
-#         subu $t3, $t0, $t1
-#         addi $t4, $zero, 4
-#         bne $t3, $t4, inf
-#         jal reset
-# test_and_00:
-#         addi $t0, $zero, 0
-#         addi $t1, $zero, 0
-#         and $t2, $t0, $t1
-#         bne $t2, $zero, inf
-#         jal reset
-# test_and_01:
-#         addi $t0, $zero, 0
-#         addi $t1, $zero, 1
-#         and $t2, $t0, $t1
-#         bne $t2, $zero, inf
-#         jal reset
-# test_and_11:
-#         addi $t0, $zero, 1
-#         addi $t1, $zero, 1
-#         and $t2, $t0, $t1
-#         beq $t2, $zero, inf
-#         jal reset
-# test_and_10:
-#         addi $t0, $zero, 1
-#         addi $t1, $zero, 0
-#         and $t2, $t0, $t1
-#         bne $t2, $zero, inf
-#         jal reset
-# test_andi_00:
-#         addi $t0, $zero, 0
-#         andi $t2, $t0, 0
-#         bne $t2, $zero, inf
-#         jal reset
-# test_andi_01:
-#         addi $t0, $zero, 0
-#         andi $t2, $t0, 1
-#         bne $t2, $zero, inf
-#         jal reset
-# test_andi_11:
-#         addi $t0, $zero, 1
-#         andi $t2, $t0, 1
-#         beq $t2, $zero, inf
-#         jal reset
-# test_andi_10:
-#         addi $t0, $zero, 1
-#         andi $t2, $t0, 0
-#         bne $t2, $zero, inf
-#         jal reset
-# test_or_00:
-#         addi $t0, $zero, 0
-#         addi $t1, $zero, 0
-#         or $t2, $t0, $t1
-#         bne $t2, $zero, inf
-#         jal reset
-# test_or_01:
-#         addi $t0, $zero, 0
-#         addi $t1, $zero, 1
-#         or $t2, $t0, $t1
-#         beq $t2, $zero, inf
-#         jal reset
+test_subu_neg:
+                                      # test subu (neg result)
+        ori $t0, $t0, 0x0
+        ori $t1, $t1, 0x4
+        subu $t3, $t0, $t1
+        lui $t4, 0xFFFF
+        ori $t4, $t4, 0xFFFC
+        bne $t3, $t4, inf
+        jal reset
+test_subu_neg_1:
+                                      # test subu (neg result)
+        ori $t0, $t0, 0x4
+        ori $t1, $t1, 0x0
+        subu $t3, $t0, $t1
+        addi $t4, $zero, 4
+        bne $t3, $t4, inf
+        jal reset
+test_and_00:
+        addi $t0, $zero, 0
+        addi $t1, $zero, 0
+        and $t2, $t0, $t1
+        bne $t2, $zero, inf
+        jal reset
+test_and_01:
+        addi $t0, $zero, 0
+        addi $t1, $zero, 1
+        and $t2, $t0, $t1
+        bne $t2, $zero, inf
+        jal reset
+test_and_11:
+        addi $t0, $zero, 1
+        addi $t1, $zero, 1
+        and $t2, $t0, $t1
+        beq $t2, $zero, inf
+        jal reset
+test_and_10:
+        addi $t0, $zero, 1
+        addi $t1, $zero, 0
+        and $t2, $t0, $t1
+        bne $t2, $zero, inf
+        jal reset
+test_andi_00:
+        addi $t0, $zero, 0
+        andi $t2, $t0, 0
+        bne $t2, $zero, inf
+        jal reset
+test_andi_01:
+        addi $t0, $zero, 0
+        andi $t2, $t0, 1
+        bne $t2, $zero, inf
+        jal reset
+test_andi_11:
+        addi $t0, $zero, 1
+        andi $t2, $t0, 1
+        beq $t2, $zero, inf
+        jal reset
+test_andi_10:
+        addi $t0, $zero, 1
+        andi $t2, $t0, 0
+        bne $t2, $zero, inf
+        jal reset
+test_or_00:
+        addi $t0, $zero, 0
+        addi $t1, $zero, 0
+        or $t2, $t0, $t1
+        bne $t2, $zero, inf
+        jal reset
+test_or_01:
+        addi $t0, $zero, 0
+        addi $t1, $zero, 1
+        or $t2, $t0, $t1
+        beq $t2, $zero, inf
+        jal reset
 # test_or_11:
 #         addi $t0, $zero, 1
 #         addi $t1, $zero, 1

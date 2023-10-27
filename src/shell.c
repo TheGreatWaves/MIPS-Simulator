@@ -239,8 +239,11 @@ void go() {
   }
 
   printf("Simulating...\n\n");
-  while (RUN_BIT)
+  while (RUN_BIT || cycles_padding > 0)
+  {
+    if (!RUN_BIT) --cycles_padding;
     cycle();
+  }
   printf("Simulator halted\n\n");
 }
 
@@ -781,7 +784,8 @@ void test()
 {
   reset();
   int count = 0;
-  for (int i=0; i<52; i++)
+  int tests = 52;
+  for (int i=0; i<tests; i++)
   {
     reset();
 
@@ -824,7 +828,7 @@ void test()
 
   printf("[ Correct ]: %d\n", count);
   printf("[ Incorrect ]: \n");
-  for (int i=0; i<52; i++)
+  for (int i=0; i<tests; i++)
   {
     if (results[i]==0)
     {

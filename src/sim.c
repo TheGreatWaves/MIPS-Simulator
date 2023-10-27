@@ -16,6 +16,10 @@ u32 writeback_count = 0;
 
 u32 cycle_number = 0;
 
+u32 alu_result_to_forward = -1;
+
+u32 cycles_padding = 0;
+
 /////////////////////////////////////
 // NOTE(Appy): Pipeline stalls
 
@@ -131,13 +135,28 @@ void handle_rtype(u8 op)
   {
     break; case SYSCALL:
     {
-      if (CURRENT_STATE.REGS[R_V0] == 0x0A) {
+      // Check if V0 is forwarded.
+      if (pr_id_ex.forwarded)
+      {
+        dprint("Checking forwarded: %d!\n", pr_ex_mem.alu_res);
+
+        if (pr_ex_mem.alu_res == 0x0A)
+        {
+          dprint("V0 == 0xA, terminating...%s\n", "");
+
+          // We can stop fetching.
+          status.fetch = STATUS_STALL;
+          RUN_BIT = FALSE;
+        }
+      }
+      else if (CURRENT_STATE.REGS[R_V0] == 0x0A) {
         dprint("V0 == 0xA, terminating...%s\n", "");
 
         // We can stop fetching.
         status.fetch = STATUS_STALL;
         RUN_BIT = FALSE;
       }
+      cycles_padding += 3;
     }
     break; case ADD:
            case ADDU:
@@ -274,8 +293,24 @@ void handle_rtype(u8 op)
   }
 }
 
+u32 get_forwarded_data(u8 desired_reg)
+{
+  // Check from the execute stage first. If the reg destination matches then we forward from it.
+  if (pr_ex_mem.rd == desired_reg)
+  {
+    return pr_ex_mem.alu_res;
+  }
+  else if (pr_mem_wb.rd == desired_reg)
+  {
+    return pr_mem_wb.alu_res;
+  }
+
+  dprint("ERROR: FAILED TO RETRIEVE FORWARDED DATA%s!\n", "");
+  return 0;
+}
+
 // Returns TRUE if there is a dependency issue, false otherwise.
-inline bool has_dependency()
+bool has_dependency()
 {
   enum EOPCODES instr = cast(enum EOPCODES, GET(OP, pr_if_id.instruction));
 
@@ -289,6 +324,12 @@ inline bool has_dependency()
       {
         break; case SYSCALL:
         {
+          if (pr_ex_mem.rd == R_V0 && pr_ex_mem.mcs.MemRead == MemRead_no)
+          {
+            pr_id_ex.forwarded = true;
+            return false;
+          }
+
           dprint("Data harzard detected for syscall, stalling %s\n", "decode");
           return REG_STATUS[R_V0] == REG_NOT_READY;
         }
@@ -307,15 +348,52 @@ inline bool has_dependency()
   // One of the registers we're reading from is not ready.
   u8 rti = GET(RT, pr_if_id.instruction);
   u8 rsi = GET(RS, pr_if_id.instruction);
+  
+  bool rt_not_ready = (REG_STATUS[rti] == REG_NOT_READY);
+  bool rs_not_ready = (REG_STATUS[rsi] == REG_NOT_READY);
+  bool rt_rs_same = (rti == rsi);
+  bool both_not_ready = (rt_not_ready && rs_not_ready);
 
-  if (REG_STATUS[rti] == REG_NOT_READY)
-  {
-    dprint("Dependency for RT register: %u\n", rsi);
-  }
+  // We consider it forward-able if the execute writes to register and has no business with memory.
+  bool forward_able = (pr_id_ex.wbcs.RegWrite == RegWrite_yes && pr_id_ex.mcs.MemRead == MemRead_no);
 
-  if (REG_STATUS[rsi] == REG_NOT_READY)
+  dprint("Both is not ready: %d\n", both_not_ready);
+
+  // Everything below this is forward-able, no need to wait for writeback.
+  if (forward_able)
   {
-    dprint("Dependency for RS register: %u\n", rti);
+    if (rt_rs_same && rt_not_ready)
+    {
+      // Note that one implies the other in this case. If RT is not ready, RS will also not be ready.
+      // Since it's forward-able, we forward the value for both RT and RS.
+      pr_id_ex.rsv = get_forwarded_data(rsi);
+      pr_id_ex.rtv = get_forwarded_data(rti);
+      dprint("Forwarding RSV %d\n", pr_id_ex.rsv);
+      dprint("Forwarding RTV %d\n", pr_id_ex.rtv);
+      pr_id_ex.forwarded = forwarded_both;
+    }
+    else // Not the same. We have to check each individually.
+    {
+      if (rt_not_ready)
+      {
+        // Forward RT
+        pr_id_ex.rtv = get_forwarded_data(rti);
+        dprint("Forwarding RTV %d\n", pr_id_ex.rtv);
+        pr_id_ex.forwarded = forwarded_rt;
+      }
+      if (rs_not_ready)
+      {
+        // Forward RS
+        pr_id_ex.rsv = get_forwarded_data(rsi);
+        dprint("Forwarding RSV %d\n", pr_id_ex.rsv);
+        pr_id_ex.forwarded = forwarded_rs;
+      }
+      if (both_not_ready)
+      {
+        pr_id_ex.forwarded = forwarded_both;
+      }
+    }
+    return false;
   }
 
   return (REG_STATUS[rti] == REG_NOT_READY) || (REG_STATUS[rsi] == REG_NOT_READY);
@@ -346,7 +424,7 @@ inline void link_next_pc()
 }
 
 // Read registers and sign extend the immediate and store them.
-inline void retrieve_values()
+void retrieve_values()
 {
   // Forward the PC
   pr_id_ex.pc = pr_if_id.pc;
@@ -358,12 +436,37 @@ inline void retrieve_values()
   // This is never on the RHS. We never need to store $RD.
   pr_id_ex.rdi = GET(RD, pr_if_id.instruction);
 
-  // Store register values
-  pr_id_ex.rtv = CURRENT_STATE.REGS[pr_id_ex.rti];
-  pr_id_ex.rsv = CURRENT_STATE.REGS[pr_id_ex.rsi];
+  dprint("RSI: %d\n", pr_id_ex.rsi);
+  dprint("RTI: %d\n", pr_id_ex.rti);
 
-  dprint("RT loaded: %d from register %d\n", CURRENT_STATE.REGS[pr_id_ex.rti], pr_id_ex.rti);
-  dprint("RS loaded: %d from register %d\n", CURRENT_STATE.REGS[pr_id_ex.rsi], pr_id_ex.rsi);
+  switch(pr_id_ex.forwarded)
+  {
+    break; case forwarded_none:
+    {
+      // Store register values
+      pr_id_ex.rtv = CURRENT_STATE.REGS[pr_id_ex.rti];
+      pr_id_ex.rsv = CURRENT_STATE.REGS[pr_id_ex.rsi];
+      dprint("RT loaded: %d from register %d\n", CURRENT_STATE.REGS[pr_id_ex.rti], pr_id_ex.rti);
+      dprint("RS loaded: %d from register %d\n", CURRENT_STATE.REGS[pr_id_ex.rsi], pr_id_ex.rsi);
+    }
+    break; case forwarded_rt:
+    {
+      pr_id_ex.rsv = CURRENT_STATE.REGS[pr_id_ex.rsi];
+      dprint("RS loaded: %d from register %d\n", CURRENT_STATE.REGS[pr_id_ex.rsi], pr_id_ex.rsi);
+      dprint("RT forwarded: %d\n", pr_id_ex.rtv);
+    }
+    break; case forwarded_rs:
+    {
+      pr_id_ex.rtv = CURRENT_STATE.REGS[pr_id_ex.rti];
+      dprint("RT loaded: %d from register %d\n", CURRENT_STATE.REGS[pr_id_ex.rti], pr_id_ex.rti);
+      dprint("rs forwarded: %d\n", pr_id_ex.rsv);
+    }
+    break; case forwarded_both:
+    {
+      dprint("rs forwarded: %d\n", pr_id_ex.rsv);
+      dprint("rt forwarded: %d\n", pr_id_ex.rtv);
+    }
+  }
 
   // Indiscriminately sign extend the 16 bits immediate and store it.
   pr_id_ex.imm = sign_extend_16(u32t(GET(IM, pr_if_id.instruction)));
@@ -437,7 +540,6 @@ PIPE_LINE_STAGE void decode()
   // - Rt, Rs val
   // This is independent from instruction type.
   retrieve_values();
-
 
   // Set control signals
   enum EOPCODES instr = cast(enum EOPCODES, GET(OP, pr_if_id.instruction));
@@ -662,6 +764,10 @@ PIPE_LINE_STAGE void decode()
     }
   }
 
+  dprint("Resetted forward flag\n", "");
+  // Reset forwarded flag.
+  pr_id_ex.forwarded = forwarded_none;
+
   set_register_dependency();
 }
 
@@ -731,6 +837,7 @@ inline void set_alu_result(u32 v)
 void execute_alu()
 {
   set_alu_result(0);
+
   switch (pr_id_ex.ecs.ALUOp)
   {
     break; case ALUOp_ADD: 
@@ -888,6 +995,7 @@ void execute_alu()
 
 PIPE_LINE_STAGE void execute()
 {
+
   forward_control_id_ex_to_ex_mem();
   calculate_pc_target();
   // Forward the second register value (This is for SW)
@@ -895,6 +1003,7 @@ PIPE_LINE_STAGE void execute()
   choose_register_destination();
   execute_alu();
   pr_id_ex.ecs.ALUOp = ALUOp_NOOP;
+
 }
 
 /////////////////////////////////////
@@ -1341,206 +1450,3 @@ void process_instruction()
   cycle_number++;
 }
 
-void lprocess_instruction() {
-  /* Instruction jump tables */
-  // static const void *jumpTable[] = {OPCODES(MK_LBL) MK_LBL(NEXT_STATE)};
-
-  fetch();
-
-  decode();
-
-  execute();
-
-  memory();
-
-  writeback();
-  
-
-//   uint32_t INSTRUCTION_REGISTER = pr_if_id.instruction;
-
-//   /* Retrieve the opcode of the instruction. */
-//   uint8_t instr = GET(OP, INSTRUCTION_REGISTER);
-
-// /* Helpers */
-// #define END_LABEL LBL(NEXT_STATE) :
-// #define RS (CURRENT_STATE.REGS[GET(RS, INSTRUCTION_REGISTER)])
-// #define RT (NEXT_STATE.REGS[GET(RT, INSTRUCTION_REGISTER)])
-// #define IMM (GET(IM, INSTRUCTION_REGISTER))
-
-//   /* Dispatch the instruction. */
-//   DISPATCH(instr) {
-//     /* First six bits are 0s */
-//     LBL(SPECIAL) : {
-//       CALL_HANDLER(SPECIAL);
-//       NEXT;
-//     }
-//     LBL(REGIMM) : {
-//       CALL_HANDLER(REGIMM);
-//       NEXT;
-//     }
-
-//     /* Basic cases, none of these messes control flow */
-//     LBL(ADDI) : LBL(ADDIU) : {
-//       uint32_t result = sign_extend_16(u32t(IMM));
-//       RT = RS + result;
-//       NEXT;
-//     }
-//     LBL(XORI) : {
-//       RT = RS ^ u32t(IMM);
-//       NEXT;
-//     }
-//     LBL(ANDI) : {
-//       RT = RS & u32t(IMM);
-//       NEXT;
-//     }
-//     LBL(ORI) : {
-//       RT = RS | u32t(IMM);
-//       NEXT;
-//     }
-//     LBL(LUI) : {
-//       RT = (IMM << 16);
-//       NEXT;
-//     }
-//     LBL(J) : {
-//       u32 jp = GET_BLOCK(INSTRUCTION_REGISTER, 0, 26);
-//       CURRENT_STATE.PC = ((jp << 2) - 4);
-//       NEXT;
-//     }
-
-//     /* Default case. */
-//     LBL(PADDING) : { NEXT; }
-//     LBL(SB) : {
-//       uint32_t offset = sign_extend_16(IMM);
-//       uint32_t address = offset + RS;
-//       uint32_t r_rt = CURRENT_STATE.REGS[GET(RT, INSTRUCTION_REGISTER)];
-//       uint32_t last_byte = (GET_BLOCK(r_rt, 0, 8));
-//       mem_write_32(address, last_byte);
-//       NEXT;
-//     }
-//     LBL(SH) : {
-//       uint32_t offset = sign_extend_16(IMM);
-//       uint32_t address = offset + RS;
-//       uint32_t r_rt = CURRENT_STATE.REGS[GET(RT, INSTRUCTION_REGISTER)];
-//       uint32_t last_byte = (GET_BLOCK(r_rt, 0, 16));
-//       mem_write_32(address, last_byte);
-//       NEXT;
-//     }
-//     LBL(SW) : {
-//       u32 vAddr = RS + sign_extend_16(IMM);
-//       mem_write_32(vAddr, RT);
-//       NEXT;
-//     }
-//     LBL(SLTI) : {
-//       RT = (cast(s32, RS) < cast(s32, sign_extend_16(IMM))) ? 1 : 0;
-//       NEXT;
-//     }
-//     LBL(SLTIU) : {
-//       u32 result = RS - sign_extend_16(IMM);
-//       RT = (RS < result) ? 1 : 0;
-//       NEXT;
-//     }
-//     LBL(LB) : {
-//       u32 vAddr = RS + sign_extend_16(IMM);
-//       u32 content = mem_read_32(vAddr);
-//       u32 byte = GET_BLOCK(content, 0, 8);
-
-//       u32 byte_extended = sign_extend_8(byte);
-//       RT = byte_extended;
-//       NEXT;
-//     }
-//     LBL(LBU) : {
-//       u32 vAddr = RS + sign_extend_16(IMM);
-//       u32 content = mem_read_32(vAddr);
-//       u32 byte = GET_BLOCK(content, 0, 8);
-//       RT = byte;
-//       NEXT;
-//     }
-//     LBL(LH) : {
-//       u32 vAddr = RS + sign_extend_16(IMM);
-//       u32 content = mem_read_32(vAddr);
-//       u32 byte = GET_BLOCK(content, 0, 16);
-
-//       u32 byte_extended = sign_extend_16(byte);
-//       RT = byte_extended;
-//       NEXT;
-//     }
-//     LBL(LHU) : {
-//       u32 vAddr = RS + sign_extend_16(IMM);
-//       u32 content = mem_read_32(vAddr);
-//       u32 byte = GET_BLOCK(content, 0, 16);
-//       RT = byte;
-//       NEXT;
-//     }
-//     LBL(LW) : {
-//       u32 vAddr = RS + sign_extend_16(IMM);
-//       RT = mem_read_32(vAddr);
-//       NEXT;
-//     }
-//     LBL(JAL) : {
-//       u32 temp = (GET_BLOCK(INSTRUCTION_REGISTER, 0, 25) << 2);
-//       NEXT_STATE.REGS[R_RA] = CURRENT_STATE.PC + 4;
-//       CURRENT_STATE.PC = temp - 4;
-//       NEXT;
-//     }
-//     LBL(BEQ) : {
-//       u32 rs = RS;
-//       u32 rt = RT;
-//       u32 addr = CURRENT_STATE.PC + (sign_extend_16(IMM) << 2);
-//       if (rs == rt) {
-//         CURRENT_STATE.PC = addr - 4;
-//       }
-//       NEXT;
-//     }
-//     LBL(BNE) : {
-//       u32 rs = RS;
-//       u32 rt = RT;
-//       u32 addr = CURRENT_STATE.PC + (sign_extend_16(IMM) << 2);
-
-//       if (rs != rt) {
-//         CURRENT_STATE.PC = addr - 4;
-//       }
-
-//       NEXT;
-//     }
-//     LBL(BLEZ) : {
-//       u32 rs = RS;
-//       u32 addr = CURRENT_STATE.PC + (sign_extend_16(IMM) << 2);
-
-//       if (rs == 0 || ((rs >> 31) == 1)) {
-//         CURRENT_STATE.PC = addr - 4;
-//       }
-
-//       NEXT;
-//     }
-//     LBL(BGTZ) : {
-//       u32 rs = RS;
-//       u32 addr = CURRENT_STATE.PC + (sign_extend_16(IMM) << 2);
-
-//       if (rs != 0 && ((rs >> 31) == 0)) {
-//         CURRENT_STATE.PC = addr - 4;
-//       }
-//       NEXT;
-//     }
-//   }
-
-//   /* This is place in this way in order to allow disabling of threaded code */
-//   END_LABEL {
-//     /* Increment the program counter */
-//     NEXT_STATE.PC = CURRENT_STATE.PC + 4;
-//   }
-
-// /* Undefine guards */
-// #undef END_LABEL
-
-// #ifdef RS
-// #undef RS
-// #endif
-
-// #ifdef RT
-// #undef RT
-// #endif
-
-// #ifdef IMM
-// #undef IMM
-// #endif
-}
