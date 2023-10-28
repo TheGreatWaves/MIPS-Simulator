@@ -175,6 +175,7 @@ PIPE_LINE_REGISTER typedef struct
   u32                     mem_res;
   u32                     target;
   u8                      rd;
+  bool                    read_mem;
   WriteBackControlSignals wbcs;
 } PR_MEM_WB;
 

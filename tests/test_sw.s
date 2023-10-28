@@ -46,7 +46,7 @@ test_sw_offset:
 	# Should be the same
 	bne $t1, $t0, inf
 	sw $zero, 4($3)
-	jal reset
+ 	jal reset
 test_sw_offset_half:
 	lui $3, 0x1000
 

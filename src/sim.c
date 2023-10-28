@@ -140,7 +140,7 @@ void handle_rtype(u8 op)
       {
         dprint("Checking forwarded: %d!\n", pr_ex_mem.alu_res);
 
-        if (pr_ex_mem.alu_res == 0x0A)
+        if (pr_ex_mem.alu_res == 0x0A || pr_ex_mem.mem_res == 0x0A)
         {
           dprint("V0 == 0xA, terminating...%s\n", "");
 
@@ -324,13 +324,13 @@ bool has_dependency()
       {
         break; case SYSCALL:
         {
-          if (pr_ex_mem.rd == R_V0 && pr_ex_mem.mcs.MemRead == MemRead_no)
+          if (pr_ex_mem.rd == R_V0 && pr_ex_mem.mcs.MemRead == MemRead_no
+          ||  pr_mem_wb.rd == R_V0 && pr_mem_wb.read_mem)
           {
             pr_id_ex.forwarded = true;
             return false;
           }
 
-          dprint("Data harzard detected for syscall, stalling %s\n", "decode");
           return REG_STATUS[R_V0] == REG_NOT_READY;
         }
         break; case MFHI:
@@ -723,7 +723,7 @@ PIPE_LINE_STAGE void decode()
     }
   }
 
-  dprint("Resetted forward flag\n", "");
+  dprint("%sResetted forward flag\n", "");
   // Reset forwarded flag.
   pr_id_ex.forwarded = forwarded_none;
 
@@ -1008,6 +1008,7 @@ void forward_data()
 
 PIPE_LINE_STAGE void execute()
 {
+  dprint("Running execute%s\n", "");
 
   forward_control_id_ex_to_ex_mem();
   calculate_pc_target();
@@ -1245,13 +1246,111 @@ HANDLER(SPECIAL) {
 #undef SA
 }
 
+u32 get_forwarded_memory_data(u8 desired_reg)
+{
+  // Check from the execute stage first. If the reg destination matches then we forward from it.
+  if (pr_ex_mem.rd == desired_reg)
+  {
+    return pr_ex_mem.mem_res;
+  }
+  else if (pr_mem_wb.rd == desired_reg)
+  {
+    return pr_mem_wb.mem_res;
+  }
+
+  dprint("ERROR: FAILED TO RETRIEVE FORWARDED DATA%s!\n", "");
+  return 0;
+}
+
+void forward_memory_data()
+{
+  dprint("FORWARDING MEMORY!\n%s", "");
+
+// One of the registers we're reading from is not ready.
+  u8 rti = GET(RT, pr_if_id.instruction);
+  u8 rsi = GET(RS, pr_if_id.instruction);
+
+  dprint("Reading register rti: %d\n", rti);
+  dprint("Reading register rsi: %d\n", rsi);
+  
+  bool rt_not_ready = (pr_ex_mem.wbcs.RegWrite == RegWrite_yes && rti == pr_ex_mem.rd);
+  bool rs_not_ready = (pr_ex_mem.wbcs.RegWrite == RegWrite_yes && rsi == pr_ex_mem.rd);
+  bool v0_not_ready = (pr_ex_mem.wbcs.RegWrite == RegWrite_yes && R_V0 == pr_ex_mem.rd);
+
+  if (rt_not_ready)
+  {
+    dprint("RT IS NOT READY\n%s", "");
+  }
+  if (rs_not_ready)
+  {
+    dprint("RS IS NOT READY\n%s", "");
+  }
+  if (v0_not_ready)
+  {
+    dprint("V0 IS NOT READY\n%s", "");
+  }
+
+  bool rt_rs_same = (rti == rsi);
+  bool both_not_ready = (rt_not_ready && rs_not_ready);
+
+  // We consider it forward-able if the execute writes to register and has no business with memory.
+  bool forward_able = (pr_ex_mem.wbcs.RegWrite == RegWrite_yes && pr_ex_mem.mcs.MemRead == MemRead_yes);
+
+  // Everything below this is forward-able, no need to wait for writeback.
+  if (forward_able)
+  {
+    if (rt_rs_same && rt_not_ready)
+    {
+      // Note that one implies the other in this case. If RT is not ready, RS will also not be ready.
+      // Since it's forward-able, we forward the value for both RT and RS.
+      pr_id_ex.rsv = get_forwarded_memory_data(rsi);
+      pr_id_ex.rtv = get_forwarded_memory_data(rti);
+      dprint("Forwarding RSV %d (MEMORY)\n", pr_id_ex.rsv);
+      dprint("Forwarding RTV %d (MEMORY)\n", pr_id_ex.rtv);
+      pr_id_ex.forwarded = forwarded_both;
+    }
+    else // Not the same. We have to check each individually.
+    {
+      if (rt_not_ready)
+      {
+        // Forward RT
+        pr_id_ex.rtv = get_forwarded_memory_data(rti);
+        dprint("Forwarding RTV %d (MEMORY)\n", pr_id_ex.rtv);
+        pr_id_ex.forwarded = forwarded_rt;
+      }
+      if (rs_not_ready)
+      {
+        // Forward RS
+        pr_id_ex.rsv = get_forwarded_memory_data(rsi);
+        dprint("Forwarding RSV %d (MEMORY)\n", pr_id_ex.rsv);
+        pr_id_ex.forwarded = forwarded_rs;
+      }
+      if (both_not_ready)
+      {
+        pr_id_ex.forwarded = forwarded_both;
+      }
+    }
+  }
+
+  if (v0_not_ready)
+  {
+    pr_id_ex.forwarded = true;
+  }
+
+  // Unstall decode, it can run now.
+  status.decode = STATUS_READY;
+}
+
 PIPE_LINE_STAGE void memory()
 {
+  pr_mem_wb.read_mem = false;
   pr_mem_wb.target = pr_ex_mem.target;
   pr_mem_wb.wbcs = pr_ex_mem.wbcs;
 
   if (pr_ex_mem.mcs.MemRead) 
   {
+    pr_mem_wb.read_mem = true;
+
     // The ALU computes the (base + offset)
     u32 data = mem_read_32(pr_ex_mem.alu_res);
 
@@ -1278,6 +1377,9 @@ PIPE_LINE_STAGE void memory()
     }
     pr_ex_mem.mem_res = data;
     dprint("Loaded: 0x%x\n", pr_ex_mem.mem_res);
+
+    // Let's forward this data.
+    forward_memory_data();
   }
 
   if (pr_ex_mem.mcs.MemWrite)
@@ -1349,6 +1451,8 @@ inline void set_register_ready()
 
 PIPE_LINE_STAGE void writeback()
 {
+  dprint("Running writeback.%s\n", "");
+
   if (pr_mem_wb.wbcs.RegWrite == RegWrite_yes)
   {
     dprint("Writing 0x%x to register %u\n", write_back_data(), pr_mem_wb.rd);
@@ -1398,31 +1502,43 @@ pipeline_history[HISTORY_LINE_LENGTH * stage##_count + cycle_number] = (status.s
 
 void process_instruction() 
 {
-  log_history(writeback, 'w');
-  log_history(memory, 'm');
-  log_history(execute, 'e');
 
   if (status.writeback == STATUS_READY)
   {
+    log_history(writeback, 'w');
     writeback_count++;
     writeback();
     status.writeback = STATUS_STALL;
   }
+  else
+  {
+    log_history(writeback, 'w');
+  }
 
   if (status.memory == STATUS_READY)
   {
+    log_history(memory, 'm');
     memory_count++;
     status.writeback = STATUS_READY;
     memory();
     status.memory = STATUS_STALL;
   }
+  else
+  {
+    log_history(memory, 'm');
+  }
 
   if (status.execute == STATUS_READY)
   {
+    log_history(execute, 'e');
     execute_count++;
     status.memory = STATUS_READY;
     execute();
     status.execute = STATUS_STALL;
+  }
+  else
+  {
+    log_history(execute, 'e');
   }
 
   if (status.decode == STATUS_READY)
@@ -1455,10 +1571,14 @@ void process_instruction()
 
   if (status.fetch == STATUS_READY)
   {
-    log_fetch();
+    log_history(fetch, 'f');
     fetch_count++;
     status.decode = STATUS_READY;
     fetch();
+  }
+  else
+  {
+    log_history(fetch, 'f');
   }
 
   cycle_number++;
