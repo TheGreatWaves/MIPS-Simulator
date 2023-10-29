@@ -1024,60 +1024,6 @@ void execute_alu()
   }
 }
 
-void forward_data()
-{
-  // One of the registers we're reading from is not ready.
-  u8 rti = GET(RT, pr_if_id.instruction);
-  u8 rsi = GET(RS, pr_if_id.instruction);
-
-  dprint("Reading register rti: %d\n", rti);
-  dprint("Reading register rsi: %d\n", rsi);
-  
-  bool rt_not_ready = (pr_ex_mem.wbcs.RegWrite == RegWrite_yes &&  rti == pr_ex_mem.rd) || (pr_mem_wb.wbcs.RegWrite == RegWrite_yes && rti == pr_mem_wb.rd);
-  bool rs_not_ready = (pr_ex_mem.wbcs.RegWrite == RegWrite_yes &&  rsi == pr_ex_mem.rd) || (pr_mem_wb.wbcs.RegWrite == RegWrite_yes && rsi == pr_mem_wb.rd);
-  bool rt_rs_same = (rti == rsi);
-  bool both_not_ready = (rt_not_ready && rs_not_ready);
-
-  // We consider it forward-able if the execute writes to register and has no business with memory.
-  bool forward_able = (pr_id_ex.wbcs.RegWrite == RegWrite_yes && pr_id_ex.mcs.MemRead == MemRead_no);
-
-  // Everything below this is forward-able, no need to wait for writeback.
-  if (forward_able)
-  {
-    if (rt_rs_same && rt_not_ready)
-    {
-      // Note that one implies the other in this case. If RT is not ready, RS will also not be ready.
-      // Since it's forward-able, we forward the value for both RT and RS.
-      pr_id_ex.rsv = get_forwarded_data(rsi);
-      pr_id_ex.rtv = get_forwarded_data(rti);
-      dprint("Forwarding RSV %d\n", pr_id_ex.rsv);
-      dprint("Forwarding RTV %d\n", pr_id_ex.rtv);
-      pr_id_ex.forwarded = forwarded_both;
-    }
-    else // Not the same. We have to check each individually.
-    {
-      if (rt_not_ready)
-      {
-        // Forward RT
-        pr_id_ex.rtv = get_forwarded_data(rti);
-        dprint("Forwarding RTV %d\n", pr_id_ex.rtv);
-        pr_id_ex.forwarded = forwarded_rt;
-      }
-      if (rs_not_ready)
-      {
-        // Forward RS
-        pr_id_ex.rsv = get_forwarded_data(rsi);
-        dprint("Forwarding RSV %d\n", pr_id_ex.rsv);
-        pr_id_ex.forwarded = forwarded_rs;
-      }
-      if (both_not_ready)
-      {
-        pr_id_ex.forwarded = forwarded_both;
-      }
-    }
-  }
-}
-
 PIPE_LINE_STAGE void execute()
 {
   dprint("Running execute%s\n", "");
@@ -1089,7 +1035,6 @@ PIPE_LINE_STAGE void execute()
   choose_register_destination();
   execute_alu();
   pr_id_ex.ecs.ALUOp = ALUOp_NOOP;
-  // forward_data();
 }
 
 /////////////////////////////////////
@@ -1334,85 +1279,6 @@ u32 get_forwarded_memory_data(u8 desired_reg)
   return 0;
 }
 
-void forward_memory_data()
-{
-  dprint("FORWARDING MEMORY!\n%s", "");
-
-// One of the registers we're reading from is not ready.
-  u8 rti = GET(RT, pr_if_id.instruction);
-  u8 rsi = GET(RS, pr_if_id.instruction);
-
-  dprint("Reading register rti: %d\n", rti);
-  dprint("Reading register rsi: %d\n", rsi);
-  
-  bool rt_not_ready = (pr_ex_mem.wbcs.RegWrite == RegWrite_yes && rti == pr_ex_mem.rd);
-  bool rs_not_ready = (pr_ex_mem.wbcs.RegWrite == RegWrite_yes && rsi == pr_ex_mem.rd);
-  bool v0_not_ready = (pr_ex_mem.wbcs.RegWrite == RegWrite_yes && R_V0 == pr_ex_mem.rd);
-
-  if (rt_not_ready)
-  {
-    dprint("RT IS NOT READY\n%s", "");
-  }
-  if (rs_not_ready)
-  {
-    dprint("RS IS NOT READY\n%s", "");
-  }
-  if (v0_not_ready)
-  {
-    dprint("V0 IS NOT READY\n%s", "");
-  }
-
-  bool rt_rs_same = (rti == rsi);
-  bool both_not_ready = (rt_not_ready && rs_not_ready);
-
-  // We consider it forward-able if the execute writes to register and has no business with memory.
-  bool forward_able = (pr_ex_mem.wbcs.RegWrite == RegWrite_yes && pr_ex_mem.mcs.MemRead == MemRead_yes);
-
-  // Everything below this is forward-able, no need to wait for writeback.
-  if (forward_able)
-  {
-    if (rt_rs_same && rt_not_ready)
-    {
-      // Note that one implies the other in this case. If RT is not ready, RS will also not be ready.
-      // Since it's forward-able, we forward the value for both RT and RS.
-      pr_id_ex.rsv = get_forwarded_memory_data(rsi);
-      pr_id_ex.rtv = get_forwarded_memory_data(rti);
-      dprint("Forwarding RSV %d (MEMORY)\n", pr_id_ex.rsv);
-      dprint("Forwarding RTV %d (MEMORY)\n", pr_id_ex.rtv);
-      pr_id_ex.forwarded = forwarded_both;
-    }
-    else // Not the same. We have to check each individually.
-    {
-      if (rt_not_ready)
-      {
-        // Forward RT
-        pr_id_ex.rtv = get_forwarded_memory_data(rti);
-        dprint("Forwarding RTV %d (MEMORY)\n", pr_id_ex.rtv);
-        pr_id_ex.forwarded = forwarded_rt;
-      }
-      if (rs_not_ready)
-      {
-        // Forward RS
-        pr_id_ex.rsv = get_forwarded_memory_data(rsi);
-        dprint("Forwarding RSV %d (MEMORY)\n", pr_id_ex.rsv);
-        pr_id_ex.forwarded = forwarded_rs;
-      }
-      if (both_not_ready)
-      {
-        pr_id_ex.forwarded = forwarded_both;
-      }
-    }
-  }
-
-  if (v0_not_ready)
-  {
-    pr_id_ex.forwarded = true;
-  }
-
-  // Unstall decode, it can run now.
-  status.decode = STATUS_READY;
-}
-
 PIPE_LINE_STAGE void memory()
 {
   pr_mem_wb.read_mem = false;
@@ -1449,9 +1315,6 @@ PIPE_LINE_STAGE void memory()
     }
     pr_ex_mem.mem_res = data;
     dprint("Loaded: 0x%x\n", pr_ex_mem.mem_res);
-
-    // Let's forward this data.
-    // forward_memory_data();
   }
 
   if (pr_ex_mem.mcs.MemWrite)
