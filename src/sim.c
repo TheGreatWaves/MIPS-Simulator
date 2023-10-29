@@ -309,6 +309,28 @@ u32 get_forwarded_data(u8 desired_reg)
   return 0;
 }
 
+// This is where all the forwarding logic happens.
+// Try to see if we can forward some values.
+bool try_forwarding()
+{
+  u8 rti = GET(RT, pr_if_id.instruction);
+  u8 rsi = GET(RS, pr_if_id.instruction);
+  enum EOPCODES instr = cast(enum EOPCODES, GET(OP, pr_if_id.instruction));
+
+  bool ex_mem_write = pr_ex_mem.wbcs.RegWrite == RegWrite_yes;
+  bool mem_wb_write = pr_mem_wb.wbcs.RegWrite == RegWrite_yes;
+
+  // First we check whether a depency is actually occuring.(w.r.t Excute and Memory)
+  bool rti_has_dependency = (instr == SPECIAL // We only care about RT when it's SPECIAL. 
+                          && ((pr_ex_mem.rd == rti && ex_mem_write) || (pr_mem_wb.rd == rti && mem_wb_write)));
+  bool rsi_has_dependency = ((pr_ex_mem.rd == rsi && ex_mem_write) || (pr_mem_wb.rd == rsi && mem_wb_write));
+
+  // Failed to forward, since there is nothing to do.
+  if (!rti_has_dependency && !rsi_has_dependency) return false;
+
+  return false;
+}
+
 // Returns TRUE if there is a dependency issue, false otherwise.
 bool has_dependency()
 {
@@ -345,6 +367,9 @@ bool has_dependency()
     }
   }
   
+  // Try forwarding, if successful, return false.
+  if (try_forwarding()) return false;
+
   // One of the registers we're reading from is not ready.
   u8 rti = GET(RT, pr_if_id.instruction);
   u8 rsi = GET(RS, pr_if_id.instruction);
