@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+inline u32 write_back_data();
+
 MAKE_SIGN_EXTEND(16)
 MAKE_SIGN_EXTEND(8)
 
@@ -19,6 +21,8 @@ u32 cycle_number = 0;
 u32 alu_result_to_forward = -1;
 
 u32 cycles_padding = 0;
+
+u32 last_rd = 0;
 
 /////////////////////////////////////
 // NOTE(Appy): Pipeline stalls
@@ -309,6 +313,23 @@ u32 get_forwarded_data(u8 desired_reg)
   return 0;
 }
 
+
+u32 retrieve_forward_result(u8 reg)
+{
+  // Check from the execute stage first. If the reg destination matches then we forward from it.
+  if (pr_ex_mem.rd == reg)
+  {
+    dprint("Forwarding from EXECUTE, value: %u\n", pr_ex_mem.alu_res);
+    return pr_ex_mem.alu_res;
+  }
+  else if (pr_mem_wb.rd == reg)
+  {
+    dprint("Forwarding from MEMORY, value: %u\n", write_back_data());
+    return write_back_data();
+  }
+  return 0;
+}
+
 // This is where all the forwarding logic happens.
 // Try to see if we can forward some values.
 bool try_forwarding()
@@ -318,17 +339,44 @@ bool try_forwarding()
   enum EOPCODES instr = cast(enum EOPCODES, GET(OP, pr_if_id.instruction));
 
   bool ex_mem_write = pr_ex_mem.wbcs.RegWrite == RegWrite_yes;
+  bool ex_mem_read_mem = pr_ex_mem.mcs.MemRead == MemRead_yes;
   bool mem_wb_write = pr_mem_wb.wbcs.RegWrite == RegWrite_yes;
 
+  if (ex_mem_read_mem)
+  {
+    dprint("We were reading from memory!%s\n", "");
+  }
+
+  dprint("Wait are these the same? %d : %d\n", pr_ex_mem.rd, last_rd);
+
   // First we check whether a depency is actually occuring.(w.r.t Excute and Memory)
-  bool rti_has_dependency = (instr == SPECIAL // We only care about RT when it's SPECIAL. 
-                          && ((pr_ex_mem.rd == rti && ex_mem_write) || (pr_mem_wb.rd == rti && mem_wb_write)));
-  bool rsi_has_dependency = ((pr_ex_mem.rd == rsi && ex_mem_write) || (pr_mem_wb.rd == rsi && mem_wb_write));
+  bool rti_has_dependency = ((pr_ex_mem.rd == rti && ex_mem_write && !ex_mem_read_mem) || (pr_mem_wb.rd == rti && mem_wb_write) && !ex_mem_read_mem);
+  bool rsi_has_dependency = ((pr_ex_mem.rd == rsi && ex_mem_write && !ex_mem_read_mem) || (pr_mem_wb.rd == rsi && mem_wb_write) && !ex_mem_read_mem);
 
   // Failed to forward, since there is nothing to do.
   if (!rti_has_dependency && !rsi_has_dependency) return false;
 
-  return false;
+  bool rt_rs_same = (rti == rsi);
+  bool both_has_dependency = (rti_has_dependency && rsi_has_dependency);
+
+  if (rti_has_dependency) 
+  {
+    pr_id_ex.rtv = retrieve_forward_result(rti);
+    pr_id_ex.forwarded = forwarded_rt;
+    dprint("Forwarding RTV %d\n", pr_id_ex.rtv);
+  }
+  if (rsi_has_dependency)
+  {
+    pr_id_ex.rsv = retrieve_forward_result(rsi);
+    pr_id_ex.forwarded = forwarded_rs;
+    dprint("Forwarding RSV %d\n", pr_id_ex.rsv);
+  }
+  if (both_has_dependency)
+  {
+    pr_id_ex.forwarded = forwarded_both;
+  }
+
+  return true;
 }
 
 // Returns TRUE if there is a dependency issue, false otherwise.
@@ -368,17 +416,15 @@ bool has_dependency()
   }
   
   // Try forwarding, if successful, return false.
-  if (try_forwarding()) return false;
+  if (try_forwarding())
+  {
+    dprint("Forwarded result...\n%s", "");
+    return false;
+  }
 
   // One of the registers we're reading from is not ready.
   u8 rti = GET(RT, pr_if_id.instruction);
   u8 rsi = GET(RS, pr_if_id.instruction);
-
-  // Everything below this is forward-able, no need to wait for writeback.
-  if (pr_id_ex.forwarded != forwarded_none)
-  {
-    return false;
-  }
 
   return (REG_STATUS[rti] == REG_NOT_READY) || (REG_STATUS[rsi] == REG_NOT_READY);
 }
@@ -404,6 +450,7 @@ inline void set_register_dependency()
 inline void link_next_pc()
 {
   CURRENT_STATE.REGS[31] = pr_id_ex.pc + 4;
+  dprint("Linking pc: 0x%x\n", CURRENT_STATE.REGS[31]);
   REG_STATUS[31] = REG_NOT_READY;
 }
 
@@ -609,7 +656,7 @@ PIPE_LINE_STAGE void decode()
 
     break; case JAL:
     {
-      dprint("Decoded: %s\n", "J");
+      dprint("Decoded: %s\n", "JAL");
 
       pr_id_ex.wbcs.PCSrc = PCSrc_jump; 
 
@@ -636,7 +683,7 @@ PIPE_LINE_STAGE void decode()
     }
     break; case BLEZ:
     {
-      dprint("Decoded: %s\n", "BEQ");
+      dprint("Decoded: %s\n", "BLEZ");
       template_branch_instruction();
       pr_id_ex.ecs.ALUOp = ALUOp_BLEZ;
     }
@@ -1042,7 +1089,7 @@ PIPE_LINE_STAGE void execute()
   choose_register_destination();
   execute_alu();
   pr_id_ex.ecs.ALUOp = ALUOp_NOOP;
-  forward_data();
+  // forward_data();
 }
 
 /////////////////////////////////////
@@ -1404,7 +1451,7 @@ PIPE_LINE_STAGE void memory()
     dprint("Loaded: 0x%x\n", pr_ex_mem.mem_res);
 
     // Let's forward this data.
-    forward_memory_data();
+    // forward_memory_data();
   }
 
   if (pr_ex_mem.mcs.MemWrite)
@@ -1488,6 +1535,8 @@ PIPE_LINE_STAGE void writeback()
       break; case R_LO: pr_ex_mem.rd = CURRENT_STATE.LO = write_back_data();
       break; default: CURRENT_STATE.REGS[pr_mem_wb.rd] = write_back_data();
     }
+
+    last_rd = pr_mem_wb.rd;
     
     set_register_ready();
   }
@@ -1511,8 +1560,11 @@ PIPE_LINE_STAGE void writeback()
     // So it has to be in the outside scope.
     REG_STATUS[R_RA] = REG_READY;
 
-    // We can safely resume fetch now.
-    status.fetch = STATUS_READY;
+    if (RUN_BIT)
+    {
+      // We can safely resume fetch now.
+      status.fetch = STATUS_READY;
+    }
   }
 }
 
@@ -1598,8 +1650,12 @@ void process_instruction()
   {
     log_history(fetch, 'f');
     fetch_count++;
-    status.decode = STATUS_READY;
     fetch();
+
+    if (pr_if_id.instruction != 0)
+    {
+      status.decode = STATUS_READY;
+    }
   }
   else
   {
