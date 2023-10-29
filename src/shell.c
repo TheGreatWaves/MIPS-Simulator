@@ -88,20 +88,32 @@ uint32_t mem_read_32(uint32_t address)
     return 0;
 }
 
-void reset()
+void reset_reg_values()
 {
   CURRENT_STATE.HI = 0;
   CURRENT_STATE.LO = 0;
   for (int i = 0; i < 32; i++)
   {
     CURRENT_STATE.REGS[i] = 0;
+  }
+}
+
+void reset_reg_status()
+{
+  for (int i = 0; i < 32; i++)
+  {
     REG_STATUS[i] = REG_READY;
   }
   REG_STATUS[R_LO] = REG_READY;
   REG_STATUS[R_HI] = REG_READY;
+}
 
+void reset()
+{
   INSTRUCTION_COUNT = 0;
 
+  reset_reg_status();
+  reset_reg_values();
   reset_control_signals();
   reset_stall();
   reset_history();
@@ -852,6 +864,7 @@ inline void reset_control_signals()
   pr_id_ex.wbcs.RegDst   = 0;
   pr_id_ex.wbcs.RegWrite = 0;
   pr_id_ex.wbcs.MemToReg = 0;
+  pr_id_ex.wbcs.link     = 0;
 }
 
 void reset_stall()

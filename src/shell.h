@@ -29,7 +29,7 @@
 // #define ALLOW_PIPELINE_HISTORY
 
 // Assume max cycle is 100 (Too much to fit on screen)
-#define MAX_CYCLES 5000
+#define MAX_CYCLES 3000
 #define HISTORY_LINE_LENGTH MAX_CYCLES
 #define HISTORY_MAX_LINES 20
 #define HISTORY_BUFFER_SIZE HISTORY_LINE_LENGTH * HISTORY_MAX_LINES
@@ -99,6 +99,7 @@ typedef struct {
   u32 RegDst:   2;
   u32 MemToReg: 1;
   u32 PCSrc:    2; 
+  u32 link:     1;
 } WriteBackControlSignals;
 
 /////////////////////////////////////
@@ -158,6 +159,7 @@ PIPE_LINE_REGISTER typedef struct {
 
 PIPE_LINE_REGISTER typedef struct 
 {
+  u32                     pc;   // Program counter
   u32                     alu_res;
   u32                     mem_res;
   u32                     target;
@@ -170,6 +172,7 @@ PIPE_LINE_REGISTER typedef struct
 
 PIPE_LINE_REGISTER typedef struct 
 {
+  u32                     pc;   // Program counter
   u32                     memory_read;
   u32                     alu_res;
   u32                     mem_res;
@@ -187,6 +190,8 @@ extern PR_MEM_WB pr_mem_wb;
 void reset_control_signals();
 void reset_stall();
 void reset_history();
+void reset_reg_status();
+void reset_reg_values();
 
 extern u32 cycle_number;
 

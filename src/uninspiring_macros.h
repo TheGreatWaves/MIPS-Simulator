@@ -238,4 +238,7 @@ enum EOPCODES { OPCODES(ENUMERATE) NUMBER_OF_OPS };
 #define forwarded_rs 2
 #define forwarded_both 3
 
+#define link_no 0
+#define link_yes 1
+
 #endif /* APPY_SACRILEGIOUS_MACROS */

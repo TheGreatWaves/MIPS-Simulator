@@ -25,6 +25,15 @@ u32 cycles_padding = 0;
 u32 last_rd = 0;
 
 /////////////////////////////////////
+// NOTE(Appy): For squashing.
+const static PR_IF_ID empty_pr_if_id;
+const static PR_ID_EX empty_pr_id_ex;
+const static PR_EX_MEM empty_pr_ex_mem;
+const static PR_MEM_WB empty_pr_mem_wb;
+
+#define RESET_PR(stage) do { stage = empty_##stage; } while(false)
+
+/////////////////////////////////////
 // NOTE(Appy): Pipeline stalls
 
 Stall status = {
@@ -151,6 +160,7 @@ void handle_rtype(u8 op)
           // We can stop fetching.
           status.fetch = STATUS_STALL;
           RUN_BIT = FALSE;
+          if (cycles_padding==0) cycles_padding = 3;
         }
       }
       else if (CURRENT_STATE.REGS[R_V0] == 0x0A) {
@@ -159,8 +169,8 @@ void handle_rtype(u8 op)
         // We can stop fetching.
         status.fetch = STATUS_STALL;
         RUN_BIT = FALSE;
+        if (cycles_padding==0) cycles_padding = 3;
       }
-      cycles_padding += 3;
     }
     break; case ADD:
            case ADDU:
@@ -272,8 +282,8 @@ void handle_rtype(u8 op)
       pr_id_ex.wbcs.PCSrc = PCSrc_jump; 
 
       // Stall fetch and decode.
-      status.fetch = STATUS_STALL;
-      status.decode = STATUS_STALL;
+      // status.fetch = STATUS_STALL;
+      // status.decode = STATUS_STALL;
     }
 
     break; case JALR:
@@ -291,8 +301,8 @@ void handle_rtype(u8 op)
       pr_id_ex.rtv = pr_id_ex.pc;
 
       // Stall fetch and decode.
-      status.fetch = STATUS_STALL;
-      status.decode = STATUS_STALL;
+      // status.fetch = STATUS_STALL;
+      // status.decode = STATUS_STALL;
     }
   }
 }
@@ -341,13 +351,6 @@ bool try_forwarding()
   bool ex_mem_write = pr_ex_mem.wbcs.RegWrite == RegWrite_yes;
   bool ex_mem_read_mem = pr_ex_mem.mcs.MemRead == MemRead_yes;
   bool mem_wb_write = pr_mem_wb.wbcs.RegWrite == RegWrite_yes;
-
-  if (ex_mem_read_mem)
-  {
-    dprint("We were reading from memory!%s\n", "");
-  }
-
-  dprint("Wait are these the same? %d : %d\n", pr_ex_mem.rd, last_rd);
 
   // First we check whether a depency is actually occuring.(w.r.t Excute and Memory)
   bool rti_has_dependency = ((pr_ex_mem.rd == rti && ex_mem_write && !ex_mem_read_mem) || (pr_mem_wb.rd == rti && mem_wb_write) && !ex_mem_read_mem);
@@ -414,17 +417,27 @@ bool has_dependency()
       }
     }
   }
+
+  // One of the registers we're reading from is not ready.
+  u8 rti = GET(RT, pr_if_id.instruction);
+  u8 rsi = GET(RS, pr_if_id.instruction);
+
+  // I don't want to deal with return addresses...
+  if (rti == R_RA && REG_STATUS[R_RA] == REG_NOT_READY) return true;
+  if (rsi == R_RA && REG_STATUS[R_RA] == REG_NOT_READY) return true;
+  
   
   // Try forwarding, if successful, return false.
   if (try_forwarding())
   {
     dprint("Forwarded result...\n%s", "");
     return false;
+  } 
+  else
+  {
+    dprint("Did not need any forwarding...\n%s", "");
   }
 
-  // One of the registers we're reading from is not ready.
-  u8 rti = GET(RT, pr_if_id.instruction);
-  u8 rsi = GET(RS, pr_if_id.instruction);
 
   return (REG_STATUS[rti] == REG_NOT_READY) || (REG_STATUS[rsi] == REG_NOT_READY);
 }
@@ -441,16 +454,25 @@ inline void set_register_dependency()
     {
       break; case RegDst_hi: REG_STATUS[R_HI] = REG_NOT_READY;
       break; case RegDst_lo: REG_STATUS[R_LO] = REG_NOT_READY; 
-      break; case RegDst_rt: REG_STATUS[pr_id_ex.rti] = REG_NOT_READY; dprint("Register %u set to not ready\n", pr_id_ex.rti);
-      break; case RegDst_rd: REG_STATUS[pr_id_ex.rdi] = REG_NOT_READY; dprint("Register %u set to not ready\n", pr_id_ex.rdi);
+      break; case RegDst_rt:
+      {
+        if (pr_id_ex.rti == 0) return;
+        REG_STATUS[pr_id_ex.rti] = REG_NOT_READY; 
+        dprint("Register %u set to not ready\n", pr_id_ex.rti);
+      }
+      break; case RegDst_rd: 
+      {
+        if (pr_id_ex.rdi == 0) return;
+        REG_STATUS[pr_id_ex.rdi] = REG_NOT_READY; 
+        dprint("Register %u set to not ready\n", pr_id_ex.rdi);
+      }
     }
   }
 }
 
 inline void link_next_pc()
 {
-  CURRENT_STATE.REGS[31] = pr_id_ex.pc + 4;
-  dprint("Linking pc: 0x%x\n", CURRENT_STATE.REGS[31]);
+  pr_id_ex.wbcs.link = link_yes;
   REG_STATUS[31] = REG_NOT_READY;
 }
 
@@ -554,10 +576,10 @@ inline void template_branch_instruction()
   disable_memory();
 
   // Stall fetch we have to wait now.
-  status.fetch = STATUS_STALL;
+  // status.fetch = STATUS_STALL;
 
   // We won't be decoding as well, so we stall.
-  status.decode = STATUS_STALL;
+  // status.decode = STATUS_STALL;
 }
 
 PIPE_LINE_STAGE void decode()
@@ -650,8 +672,8 @@ PIPE_LINE_STAGE void decode()
       pr_id_ex.wbcs.PCSrc = PCSrc_jump; 
 
       // Stall fetch and decode.
-      status.fetch = STATUS_STALL;
-      status.decode = STATUS_STALL;
+      // status.fetch = STATUS_STALL;
+      // status.decode = STATUS_STALL;
     }
 
     break; case JAL:
@@ -663,8 +685,8 @@ PIPE_LINE_STAGE void decode()
       link_next_pc();
 
       // Stall fetch and decode.
-      status.fetch = STATUS_STALL;
-      status.decode = STATUS_STALL;
+      // status.fetch = STATUS_STALL;
+      // status.decode = STATUS_STALL;
     }
 
     break; case BEQ:
@@ -800,6 +822,8 @@ PIPE_LINE_STAGE void decode()
   pr_id_ex.forwarded = forwarded_none;
 
   set_register_dependency();
+
+  RESET_PR(pr_if_id);
 }
 
 inline void choose_register_destination()
@@ -830,7 +854,7 @@ inline void calculate_pc_target()
     }
     break; case PCSrc_jump:
     {
-      dprint("PC: 0x%x\n", pr_id_ex.pc);
+      dprint("TARGET(JA): 0x%x\n", pr_id_ex.ja);
       pr_ex_mem.target = pr_id_ex.ja;
     }
   }
@@ -1026,6 +1050,9 @@ void execute_alu()
 
 PIPE_LINE_STAGE void execute()
 {
+  // Foward pc
+  pr_ex_mem.pc = pr_id_ex.pc;
+
   dprint("Running execute%s\n", "");
 
   forward_control_id_ex_to_ex_mem();
@@ -1035,6 +1062,8 @@ PIPE_LINE_STAGE void execute()
   choose_register_destination();
   execute_alu();
   pr_id_ex.ecs.ALUOp = ALUOp_NOOP;
+
+  RESET_PR(pr_id_ex);
 }
 
 /////////////////////////////////////
@@ -1281,6 +1310,9 @@ u32 get_forwarded_memory_data(u8 desired_reg)
 
 PIPE_LINE_STAGE void memory()
 {
+  // Foward pc
+  pr_mem_wb.pc = pr_ex_mem.pc;
+
   pr_mem_wb.read_mem = false;
   pr_mem_wb.target = pr_ex_mem.target;
   pr_mem_wb.wbcs = pr_ex_mem.wbcs;
@@ -1355,6 +1387,7 @@ PIPE_LINE_STAGE void memory()
   // EX_MemResult -> MEM_MemResult
   pr_mem_wb.mem_res = pr_ex_mem.mem_res;
 
+  RESET_PR(pr_ex_mem);
 }
 
 
@@ -1408,20 +1441,44 @@ PIPE_LINE_STAGE void writeback()
   {
     // We got jump/branch.
 
-    if (pr_mem_wb.wbcs.PCSrc == PCSrc_jump || pr_mem_wb.alu_res == 0)
+    // Link if we got a jump/branch and link.
+    if (pr_mem_wb.wbcs.link == link_yes)
+    {
+      CURRENT_STATE.REGS[R_RA] = pr_mem_wb.pc + 4;
+      REG_STATUS[R_RA] = REG_READY;
+    }
+
+    if (pr_mem_wb.wbcs.PCSrc == PCSrc_jump)
+    {
+      // This is a branching instruction and we have to take it.
+      dprint("Jump taken, now at 0x%x!\n", pr_mem_wb.target);
+      CURRENT_STATE.PC = pr_mem_wb.target;
+      pr_if_id = empty_pr_if_id;
+      pr_id_ex = empty_pr_id_ex;
+      pr_ex_mem = empty_pr_ex_mem;
+      pr_mem_wb = empty_pr_mem_wb;
+      reset_stall();
+      reset_reg_status();
+      status.fetch = STATUS_STALL;
+    }
+    else if (pr_mem_wb.alu_res == 0)
     {
       // This is a branching instruction and we have to take it.
       dprint("Branch taken, now at 0x%x!\n", pr_mem_wb.target);
       CURRENT_STATE.PC = pr_mem_wb.target;
+      pr_if_id = empty_pr_if_id;
+      pr_id_ex = empty_pr_id_ex;
+      pr_ex_mem = empty_pr_ex_mem;
+      pr_mem_wb = empty_pr_mem_wb;
+      reset_stall();
+      reset_reg_status();
+      status.fetch = STATUS_STALL;
     }
     else
     {
       dprint("Branch not taken%s!\n", "");
     }
 
-    // This can be set whether branch is taken or not.
-    // So it has to be in the outside scope.
-    REG_STATUS[R_RA] = REG_READY;
 
     if (RUN_BIT)
     {
@@ -1429,6 +1486,8 @@ PIPE_LINE_STAGE void writeback()
       status.fetch = STATUS_READY;
     }
   }
+
+  RESET_PR(pr_mem_wb);
 }
 
 #ifdef ALLOW_PIPELINE_HISTORY
@@ -1442,7 +1501,8 @@ pipeline_history[HISTORY_LINE_LENGTH * stage##_count + cycle_number] = (status.s
 
 void process_instruction() 
 {
-
+  dprint("Cycles padding: %u\n", cycles_padding);
+  dprint("Return Address: 0x%x\n", CURRENT_STATE.REGS[R_RA]);
   if (status.writeback == STATUS_READY)
   {
     log_history(writeback, 'w');
@@ -1517,7 +1577,13 @@ void process_instruction()
 
     if (pr_if_id.instruction != 0)
     {
+      dprint("Setting decode to ready%s\n", "");
       status.decode = STATUS_READY;
+    }
+    else
+    {
+      status.fetch = STATUS_STALL;
+      RUN_BIT = FALSE;
     }
   }
   else
