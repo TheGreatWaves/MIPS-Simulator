@@ -156,7 +156,7 @@ void cycle() {
   CURRENT_STATE = NEXT_STATE;
   INSTRUCTION_COUNT++;
 
-  if (INSTRUCTION_COUNT >= 1000)
+  if (INSTRUCTION_COUNT >= 300)
   {
     CURRENT_STATE.REGS[15] = 0xffffffff;
     RUN_BIT = FALSE;
@@ -486,6 +486,19 @@ int test_file(char* name)
   return (int) CURRENT_STATE.REGS[15];
 }
 
+int test_setup(char* name)
+{
+  char path[80];
+  sprintf(path, "../tests/test_%s.x", name);
+  initialize(path, 1);
+}
+
+int run_test()
+{
+  go();
+  return (int) CURRENT_STATE.REGS[15];
+}
+
 char* instructions[] = {
   "j",      // 0
   "jal",    // 1
@@ -621,24 +634,11 @@ int test_ori()
   }
   else
   {
+    printf("Got: 0x%x and 0x%x\n", r8, r9);
     return -1;
   }
 }
 
-int test_lw()
-{
-  test_file("lw");
-  uint32_t r8 = CURRENT_STATE.REGS[8]; // $t0
-
-  if (r8==0) 
-  {
-    return 0;
-  }
-  else
-  {
-    return -1;
-  }
-}
 
 int test_jr()
 {
@@ -698,9 +698,994 @@ int test_lui()
   }
 }
 
+#define SET(reg, value) do {CURRENT_STATE.REGS[reg] = value; NEXT_STATE.REGS[reg] = value;} while(0)
+
+#define GET(reg) CURRENT_STATE.REGS[reg]
+
+int test_blez()
+{
+  test_setup("blez1");
+
+  SET(2, 10);
+  SET(8, 100);
+  SET(9, 0);
+  SET(10, -1);
+  SET(15, 0);
+
+  return run_test();
+}
+
+int test_bgtz()
+{
+  test_setup("bgtz1");
+
+  SET(2, 10);
+  SET(8, 0);
+  SET(9, -1);
+  SET(10, 100);
+  SET(15, 0);
+
+  return run_test();
+}
+
+int test_addiu()
+{
+  test_setup("addiu");
+
+  SET(2, 10);
+  SET(8, 0);
+  SET(9, -1);
+
+  run_test();
+
+  if (GET(8) == 0x1a && GET(9) == -1)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_slti()
+{
+  test_setup("slti");
+
+  SET(2, 10);
+  SET(8, -1);
+
+  SET(9, 1);
+  SET(10, 1);
+  SET(11, 0);
+
+  run_test();
+
+  if (GET(9) == 0 
+  && GET(10) == 0
+  && GET(11) == 1)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_sltiu()
+{
+  test_setup("sltiu");
+
+  SET(2, 10);
+  SET(8, -1);
+  SET(13, -2);
+
+  SET(9, 1);
+  SET(10, 1);
+  SET(11, 1);
+  SET(12, 0);
+
+  run_test();
+
+  if (GET(9) == 0 
+  && GET(10) == 0
+  && GET(11) == 0
+  && GET(12) == 1)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_andi()
+{
+  test_setup("andi");
+
+  SET(2, 10);
+  SET(8, 0);
+  SET(9, 1);
+  SET(15, 2730);
+
+  SET(10, 1);
+  SET(11, 1);
+  SET(12, 0);
+  SET(13, 1);
+  SET(14, 1);
+
+  run_test();
+
+  if (GET(10)==0
+  &&  GET(11)==0
+  &&  GET(12)==1
+  &&  GET(13)==0
+  &&  GET(14)==0)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+
+int test_xori()
+{
+  test_setup("xori");
+
+  SET(2, 10);
+  SET(8, 0);
+  SET(9, 1);
+
+  SET(10, 1);
+  SET(11, 0);
+  SET(12, 1);
+  SET(13, 0);
+
+  run_test();
+
+  if (GET(10)==0
+  &&  GET(11)==1
+  &&  GET(12)==0
+  &&  GET(13)==1)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_lb()
+{
+  test_setup("lb");
+
+  mem_write_32(0x10000000, 0xabcd);
+  mem_write_32(0x10000100, 0xab00);
+
+  SET(2, 10);
+  SET(3, 0x10000000);
+  SET(4, 0x10000100);
+
+  run_test();
+
+  if (GET(8)==0xFFFFFFcd
+  &&  GET(9)==0
+  &&  GET(10)==0xFFFFFFab)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+
+int test_lbu()
+{
+  test_setup("lbu");
+
+  mem_write_32(0x10000000, 0xabcd);
+  mem_write_32(0x10000100, 0xab00);
+
+  SET(2, 10);
+  SET(3, 0x10000000);
+  SET(4, 0x10000100);
+
+  run_test();
+
+  if (GET(8)==0xcd
+  &&  GET(9)==0
+  &&  GET(10)==0xab)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_lh()
+{
+  test_setup("lh");
+
+  mem_write_32(0x10000000, 0xabcd);
+  mem_write_32(0x10000100, 0xab00);
+  mem_write_32(0x10000200, 0x7b00);
+
+  SET(2, 10);
+  SET(3, 0x10000000);
+  SET(4, 0x10000100);
+  SET(5, 0x10000200);
+
+  run_test();
+
+  if (GET(8)==0xFFFFabcd
+  &&  GET(9)==0xFFFFab00
+  &&  GET(10)==0x7b00
+  &&  GET(11)==0xab)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_lhu()
+{
+  test_setup("lhu");
+
+  mem_write_32(0x10000000, 0xabcd);
+  mem_write_32(0x10000100, 0xab00);
+  mem_write_32(0x10000200, 0x7b00);
+
+  SET(2, 10);
+  SET(3, 0x10000000);
+  SET(4, 0x10000100);
+  SET(5, 0x10000200);
+
+  run_test();
+
+  if (GET(8)==0xabcd
+  &&  GET(9)==0xab00
+  &&  GET(10)==0x7b00
+  &&  GET(11)==0xab)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_sb()
+{
+  test_setup("sb");
+
+  SET(2, 10);
+  SET(3, 0x10000000);
+  SET(4, 0x10000100);
+  SET(5, 0x10000200);
+
+  // Write 0xcd to 0x1000~
+  SET(8, 0xabcd);
+  SET(9, 255);
+  SET(10, -1);
+
+  run_test();
+
+  int v1 = mem_read_32(0x10000000);
+  int v2 = mem_read_32(0x10000104);
+  int v3 = mem_read_32(0x10000202);
+
+  if (v1==0xcd && v2==255 && v3==0)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_sh()
+{
+  test_setup("sh");
+
+  SET(2, 10);
+  SET(3, 0x10000000);
+  SET(4, 0x10000100);
+  SET(5, 0x10000200);
+
+  // Write 0xcd to 0x1000~
+  SET(8, 0xabcd);
+  SET(9, 255);
+  SET(10, -1);
+
+  run_test();
+
+  int v1 = mem_read_32(0x10000000);
+  int v2 = mem_read_32(0x10000104);
+  int v3 = mem_read_32(0x10000202);
+  int v4 = mem_read_32(0x10000200);
+
+  printf("Got: 0x%x\n", v4);
+
+  if (v1==0xabcd && v2==255 && v3==0 && v4==0xFFFF)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_sw()
+{
+  test_setup("sw");
+
+  SET(2, 10);
+  SET(3, 0x10000000);
+  SET(4, 0x10000100);
+  SET(5, 0x10000200);
+
+  SET(8, 255);
+  SET(9, 255);
+  SET(10, -1);
+
+  run_test();
+
+  int v1 = mem_read_32(0x10000000);
+  int v2 = mem_read_32(0x10000004);
+  int v3 = mem_read_32(0x10000100);
+  int v4 = mem_read_32(0x10000102);
+  int v5 = mem_read_32(0x10000103);
+
+  if (v1==255 
+  && v2==255 
+  && v3==-1
+  && v4==0xFFFF
+  && v5==0xFF)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+
+int test_bltz()
+{
+  test_setup("bltz");
+
+  // For syscall.
+  SET(2, 10);
+
+  SET(3, -1);
+  SET(4, 1);
+
+  // Expect this to remain 0.
+  SET(15, 0);
+
+  run_test();
+}
+
+int test_bltzal()
+{
+  test_setup("bltzal");
+
+  SET(2, 10);
+  SET(3, -1);
+  SET(4, 0);
+  int res = run_test();
+
+  if (GET(8) == 0x400004 
+  && GET(9) == 0x400014)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_bgezal()
+{
+  test_setup("bgezal");
+
+  SET(2, 10);
+
+  // Take
+  SET(3, 0);
+
+  // Not take
+  SET(4, -1);
+  int res = run_test();
+
+  printf("Got 0x%x\n", GET(10));
+
+  if (GET(8) == 0x400004 
+  && GET(9) == 0x400014
+  && GET(10) == 0x40001c)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_sll()
+{
+  test_setup("sll");
+
+  SET(2, 10);
+  SET(8, 1);
+
+  int res = run_test();
+
+  if (GET(9) == 8
+  && GET(10) == 16)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_srl()
+{
+  test_setup("srl");
+
+  SET(2, 10);
+  SET(8, 32);
+
+  int res = run_test();
+
+  if (GET(9) == 8
+  && GET(10) == 4
+  && GET(11) == 2)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_sra()
+{
+  test_setup("sra");
+
+  SET(2, 10);
+
+  SET(8, 3);
+  SET(9, -16);
+  // Result in 10
+
+  SET(11, 3);
+  SET(12, -69);
+  // Result in 13
+
+  SET(4, 3);
+  SET(5, 16);
+  // Result in 6
+
+  int res = run_test();
+
+  if (res==0
+  && GET(10)==-2
+  && GET(13)==-9
+  && GET(6)==2)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_sllv()
+{
+  test_setup("sllv");
+
+  SET(2, 10);
+
+  SET(8, 35);
+  SET(9, 1);
+  // Result in 10
+
+  SET(11, 33);
+  SET(12, 2);
+  // Result in 13
+
+  int res = run_test();
+
+  if (res==0
+  && GET(10)==8
+  && GET(13)==4)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_srlv()
+{
+  test_setup("srlv");
+
+  SET(2, 10);
+
+  SET(3, 2);
+  SET(4, 3);
+  SET(5, 4);
+  SET(8, 32);
+
+  int res = run_test();
+
+  if (GET(9) == 8
+  && GET(10) == 4
+  && GET(11) == 2)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_srav()
+{
+  test_setup("srav");
+
+  SET(2, 10);
+
+  SET(8, -100);
+  SET(9, 35);
+  // Result in $10.
+
+  SET(11, -32);
+  SET(12, 33);
+  // Result in $13.
+
+  int res = run_test();
+
+  if (GET(10) == -13
+  && GET(13) == -16)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_jalr()
+{
+  test_setup("jalr");
+  SET(2, 10);
+
+  SET(3, 0x400010);
+  SET(4, 0x400020);
+  SET(7, 0x400018);
+
+  int res = run_test();
+  if (GET(31)==0x400004
+  && GET(5)==0x400014
+  && GET(6)==0x400024)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_add()
+{
+  test_setup("add");
+  SET(2, 10);
+
+  SET(3, 0xa);
+  SET(4, -1);
+
+  int res = run_test();
+  if (res==0
+  && GET(8)==0xa
+  && GET(9)==-1)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_addu()
+{
+  test_setup("addu");
+  SET(2, 10);
+
+  SET(3, 0xa);
+  SET(4, -1);
+
+  int res = run_test();
+  if (res==0
+  && GET(8)==0xa
+  && GET(9)==-1)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_sub()
+{
+  test_setup("sub");
+  SET(2, 10);
+
+  SET(8, 0xFF);
+  SET(9, 0x4);
+  // result is in 10
+  // result is in 7
+
+  int res = run_test();
+
+  printf("Got: 0x%x\n", GET(10));
+  printf("Got: 0x%x\n", GET(7));
+  printf("Got: 0x%x\n", GET(6));
+
+  if (res==0
+  && GET(10)==0xFB
+  && GET(7)==0xFFFFFFFC
+  && GET(6)==0x4)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_subu()
+{
+  test_setup("subu");
+  SET(2, 10);
+
+  SET(8, 0xFF);
+  SET(9, 0x4);
+  // result is in 10
+  // result is in 7
+
+  int res = run_test();
+
+  printf("Got: 0x%x\n", GET(10));
+  printf("Got: 0x%x\n", GET(7));
+  printf("Got: 0x%x\n", GET(6));
+
+  if (res==0
+  && GET(10)==0xFB
+  && GET(7)==0xFFFFFFFC
+  && GET(6)==0x4)
+  {
+    return 0;
+  }
+  return -1;
+
+}
+
+int test_and()
+{
+  test_setup("and");
+  SET(2, 10);
+
+  SET(8, 0);
+  SET(9, 1);
+
+  printf("Got %d, expected %d\n", GET(4), 0);
+  printf("Got %d, expected %d\n", GET(5), 0);
+  printf("Got %d, expected %d\n", GET(6), 0);
+  printf("Got %d, expected %d\n", GET(7), 1);
+
+  int res = run_test();
+  if (GET(4)==0
+  && GET(5)==0
+  && GET(6)==0
+  && GET(7)==1)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_or()
+{
+  test_setup("or");
+  SET(2, 10);
+
+  SET(8, 0);
+  SET(9, 1);
+
+
+  int res = run_test();
+  if (GET(4)==0
+  && GET(5)==1
+  && GET(6)==1
+  && GET(7)==1)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_xor()
+{
+  test_setup("xor");
+  SET(2, 10);
+
+  SET(8, 0);
+  SET(9, 1);
+
+
+  int res = run_test();
+  if (res==0
+  && GET(4)==0
+  && GET(5)==1
+  && GET(6)==1
+  && GET(7)==0)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_nor()
+{
+  test_setup("nor");
+  SET(2, 10);
+
+  SET(8, 0);
+  SET(9, 1);
+
+
+  int res = run_test();
+  if (res==0
+  && GET(4)==-1
+  && GET(5)==-2
+  && GET(6)==-2
+  && GET(7)==-2)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_slt()
+{
+  test_setup("slt");
+
+  SET(2, 10);
+  SET(8, -1);
+
+  SET(4, -1);
+  SET(5, -2);
+  SET(6, 1);
+
+  SET(9, 1);
+  SET(10, 1);
+  SET(11, 0);
+
+  run_test();
+
+  if (GET(9) == 0 
+  && GET(10) == 0
+  && GET(11) == 1)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+
+int test_sltu()
+{
+  test_setup("sltu");
+
+  SET(4, 1);
+  SET(5, -1);
+  SET(6, -2);
+
+  SET(2, 10);
+  SET(8, -1);
+  SET(13, -2);
+
+  SET(9, 1);
+  SET(10, 1);
+  SET(11, 1);
+  SET(12, 0);
+
+  run_test();
+
+  if (GET(9) == 0 
+  && GET(10) == 0
+  && GET(11) == 0
+  && GET(12) == 1)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+int test_mult()
+{
+  test_setup("mult");
+  SET(2, 10);
+
+  // Mult operands
+  SET(8, 333);
+  SET(9, 111);
+
+  int res = run_test();
+  int passed1 = (res==0 && CURRENT_STATE.HI==0 && CURRENT_STATE.LO==0x9063);
+
+  printf("Got: 0x%x\n", CURRENT_STATE.HI);
+  printf("Got: 0x%x\n", CURRENT_STATE.LO);
+
+  reset();
+  test_setup("mult");
+  SET(2, 10);
+
+  // Mult operands
+  SET(8, 333);
+  SET(9, -111);
+
+  res = run_test();
+
+  printf("Got: 0x%x\n", CURRENT_STATE.HI);
+  printf("Got: 0x%x\n", CURRENT_STATE.LO);
+  int passed2 = (res==0 && CURRENT_STATE.HI==-1 && CURRENT_STATE.LO==0xFFFF6F9D);
+
+  return (passed1 && passed2) ? 0 : -1;
+}
+
+int test_multu()
+{
+  test_setup("multu");
+  SET(2, 10);
+
+  // Multu operands
+  SET(8, 333);
+  SET(9, 111);
+
+  int res = run_test();
+  int passed1 = (res==0 && CURRENT_STATE.HI==0 && CURRENT_STATE.LO==0x9063);
+
+  printf("Got: 0x%x\n", CURRENT_STATE.HI);
+  printf("Got: 0x%x\n", CURRENT_STATE.LO);
+
+  reset();
+  test_setup("multu");
+  SET(2, 10);
+
+  // Multu operands
+  SET(8, 333);
+  SET(9, -111);
+
+  res = run_test();
+
+  printf("Got: 0x%x\n", CURRENT_STATE.HI);
+  printf("Got: 0x%x\n", CURRENT_STATE.LO);
+  int passed2 = (res==0 && CURRENT_STATE.HI==0x14c && CURRENT_STATE.LO==0xFFFF6F9D);
+
+  return (passed1 && passed2) ? 0 : -1;
+}
+
+int test_div()
+{
+  test_setup("div");
+  SET(2, 10);
+
+  // div operands
+  SET(8, 421);
+  SET(9, 107);
+
+  int res = run_test();
+  int passed1 = (CURRENT_STATE.HI==0x64 && CURRENT_STATE.LO==3);
+
+  printf("Got: 0x%x, expected 0x%x\n", CURRENT_STATE.HI, 0x64);
+  printf("Got: 0x%x, expected 0x%x\n", CURRENT_STATE.LO, 3);
+  printf("Passed: %d\n", passed1);
+
+  reset();
+  test_setup("div");
+
+  // div operands
+  SET(2, 10);
+  SET(8, 421);
+  SET(9, -107);
+
+  res = run_test();
+  int passed2 = (CURRENT_STATE.HI==0x64 && CURRENT_STATE.LO==0xfffffffd);
+
+  printf("Got: 0x%x, expected 0x%x\n", CURRENT_STATE.HI, 0x64);
+  printf("Got: 0x%x, expected 0x%x\n", CURRENT_STATE.LO, 0xfffffffd);
+  printf("Passed: %d\n", passed2);
+
+  return (passed1 && passed2) ? 0 : -1;
+}
+
+int test_divu()
+{
+  test_setup("divu");
+  SET(2, 10);
+
+  // divu operands
+  SET(8, 421);
+  SET(9, 107);
+
+  int res = run_test();
+  int passed1 = (CURRENT_STATE.HI==0x64 && CURRENT_STATE.LO==3);
+
+  printf("Got: 0x%x, expected 0x%x\n", CURRENT_STATE.HI, 0x64);
+  printf("Got: 0x%x, expected 0x%x\n", CURRENT_STATE.LO, 3);
+  printf("Passed: %d\n", passed1);
+
+  reset();
+  test_setup("divu");
+
+  // divu operands
+  SET(2, 10);
+  SET(8, 421);
+  SET(9, -107);
+
+  res = run_test();
+  int passed2 = (CURRENT_STATE.HI==0x1a5 && CURRENT_STATE.LO==0);
+
+  printf("Got: 0x%x, expected 0x%x\n", CURRENT_STATE.HI, 0x1a5);
+  printf("Got: 0x%x, expected 0x%x\n", CURRENT_STATE.LO, 0);
+  printf("Passed: %d\n", passed2);
+
+  return (passed1 && passed2) ? 0 : -1;
+}
+int test_mfhi()
+{
+  test_setup("mfhi");
+  SET(2, 10);
+
+  CURRENT_STATE.HI = 0xbef;
+  NEXT_STATE.HI = 0xbef;
+
+  int res = run_test();
+
+  return (res==0 && GET(8)==0xbef) ? 0 : -1;
+}
+
+int test_mflo()
+{
+  test_setup("mflo");
+  SET(2, 10);
+
+  CURRENT_STATE.HI = 0xded;
+  NEXT_STATE.HI = 0xded;
+
+  int res = run_test();
+
+  return (res==0 && GET(8)==0xded) ? 0 : -1;
+}
+
+
+
+
+int test_bgez()
+{
+  test_setup("bgez");
+
+  // For syscall.
+  SET(2, 10);
+
+  SET(3, 0);
+  SET(4, 256);
+  SET(5, -1);
+  SET(6, -256);
+
+  // Expect this to remain 0.
+  SET(15, 0);
+
+  run_test();
+}
+
+int test_lw()
+{
+  test_setup("lw");
+
+  mem_write_32(0x10000000, 0xabcd);
+  mem_write_32(0x10000100, 0xab00);
+  mem_write_32(0x10000200, 0x7b00);
+  mem_write_32(0x10000300, 0xabcd0000);
+
+  SET(2, 10);
+  SET(3, 0x10000000);
+  SET(4, 0x10000100);
+  SET(5, 0x10000200);
+  SET(6, 0x10000300);
+
+  run_test();
+
+  if (GET(8)==0x0000abcd
+  &&  GET(9)==0x0000ab00
+  &&  GET(10)==0x7b00
+  &&  GET(11)==0xab
+  &&  GET(12)==0xabcd)
+  {
+    return 0;
+  }
+  return -1;
+}
+
+
 int test_addi()
 {
   test_file("addi");
+
+  printf("Got: 0x%x\n", CURRENT_STATE.REGS[2]);
 
   if (CURRENT_STATE.REGS[2] == 0xa) // Succeeded, jumped over.
   {
@@ -732,7 +1717,48 @@ void test()
       break; case 7: res = test_bne();
       break; case 8: res = test_ori();
       break; case 9: res = test_lui();
-      break; default: res = test_file(instructions[i]);
+      break; case 10: res = test_blez();
+      break; case 11: res = test_bgtz();
+      break; case 12: res = test_addiu();
+      break; case 13: res = test_slti();
+      break; case 14: res = test_sltiu();
+      break; case 15: res = test_andi();
+      break; case 16: res = test_xori();
+      break; case 17: res = test_lb();
+      break; case 18: res = test_lh();
+      break; case 19: res = test_lw();
+      break; case 20: res = test_lbu();
+      break; case 21: res = test_lhu();
+      break; case 22: res = test_sb();
+      break; case 23: res = test_sh();
+      break; case 24: res = test_sw();
+      break; case 25: res = test_bltz();
+      break; case 26: res = test_bgez();
+      break; case 27: res = test_bltzal();
+      break; case 28: res = test_bgezal();
+      break; case 29: res = test_sll();
+      break; case 30: res = test_srl();
+      break; case 31: res = test_sra();
+      break; case 32: res = test_sllv();
+      break; case 33: res = test_srlv();
+      break; case 34: res = test_srav();
+      break; case 35: res = test_jalr();
+      break; case 36: res = test_add();
+      break; case 37: res = test_addu();
+      break; case 38: res = test_sub();
+      break; case 39: res = test_subu();
+      break; case 40: res = test_and();
+      break; case 41: res = test_or();
+      break; case 42: res = test_xor();
+      break; case 43: res = test_nor();
+      break; case 44: res = test_slt();
+      break; case 45: res = test_sltu();
+      break; case 46: res = test_mult();
+      break; case 47: res = test_mfhi();
+      break; case 48: res = test_mfhi();
+      break; case 49: res = test_multu();
+      break; case 50: res = test_div();
+      break; case 51: res = test_divu();
     }
     int v = (res == 0) ? 1 : 0;
     count += v;
@@ -757,6 +1783,13 @@ void test()
   }
 
   printf("[ Correct ]: %d\n", count);
+  for (int i=0; i<52; i++)
+  {
+    if (results[i]!=0)
+    {
+      printf("%s\n", instructions[i]);
+    }
+  }
   printf("[ Incorrect ]: \n");
   for (int i=0; i<52; i++)
   {

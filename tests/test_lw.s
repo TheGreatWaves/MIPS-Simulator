@@ -3,8 +3,9 @@
 .text
 
 main:   
-	addi $t0, $t0, 5
-	lw $t0, 0($0)
-exit:
-        addiu $v0, $zero, 0xa
-        syscall
+	lw $8, 0($3)
+	lw $9, 0($4)
+	lw $10, 0($5)
+	lw $11, 1($4)
+	lw $12, 2($6)
+	syscall

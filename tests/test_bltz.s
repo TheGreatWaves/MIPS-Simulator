@@ -1,44 +1,23 @@
+
+
+# LB LH LW LBU
+# LHU SB SH SW BLTZ BGEZ
+# BLTZAL BGEZAL  
+
 # This test assumes that all jump and branching instruction works.
 
 .text
 
+# $3 == -1
+# $4 == 1
+
 main:   
-        j start_test
-reset:
-        addi $t0, $zero, 0
-        addi $t1, $zero, 0
-        addi $t2, $zero, 0
-        addi $t3, $zero, 0
-        addi $t4, $zero, 0
-        addi $t6, $t6, 1
-        mthi $zero
-        mtlo $zero
-        jr $ra
-start_test:
-test_bltz_take_1:
-	addi $t0, $zero, -1
-	bltz $t0, bltz_take_1
-	j inf
+	bltz $3, bltz_take_1
+error:
+        # This should be jumped over.
+	addi $15, $0, -1
+        syscall
 bltz_take_1:
-	jal reset
-test_bltz_take_2:
-	addi $t0, $zero, -25
-	bltz $t0, bltz_take_2
-	j inf
-bltz_take_2:
-	jal reset
-bltz_no_take_1:
-	bltz $t0, inf
-	jal reset
-bltz_no_take_2:
-	addi $t0, $zero, 256
-	bltz $t0, inf
-	jal reset
-done:
-        j exit
-inf:
-        addi $t7, $t7, -1
-        j exit
-exit:
-        addiu $v0, $zero, 0xa
+        # We should not take it.
+	bltz $4, error
         syscall

@@ -9,35 +9,15 @@
 .text
 
 main:   
-        j start_test
-reset:
-        addi $t0, $zero, 0
-        addi $t1, $zero, 0
-        addi $t2, $zero, 0
-        addi $t3, $zero, 0
-        addi $t4, $zero, 0
-        addi $t6, $t6, 1
-        mthi $zero
-        mtlo $zero
-        jr $ra
-start_test:
-test_sltu0:
-        addi $t0, $zero, -1           # t0 = -1
-        addi $t2, $zero, 1            # t2 = 1
-        sltu $t1, $t0, $t2            # t1 = 0 
-        bne $t1, $zero, inf
-        jal reset
-test_sltu1:
-        addi $t0, $zero, -1           # t0 = -1
-        addi $t2, $zero, -2           # t2 = 1
-        sltu $t1, $t2, $t1            # t1 = 1
-        bne $t1, $zero, inf   
-        jal reset
-done:
-        j exit
-inf:
-        addi $t7, $t7, -1
-        j exit
-exit:
-        addiu $v0, $zero, 0xa
+        # (unsigned)-1 < 1
+        sltu $9, $8, $4 
+
+        # (unsigned)-1 < (unsigned)-1
+        sltu $10, $8, $5               
+
+        # (unsigned)-1 < (unsigned)-2
+        sltu $11, $8, $6              
+
+        # (unsigned)-2 < (unsigned)-1 
+        sltu $12, $13, $5               
         syscall

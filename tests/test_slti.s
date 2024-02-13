@@ -8,34 +8,12 @@
 
 .text
 
-main:   
-        j start_test
-reset:
-        addi $t0, $zero, 0
-        addi $t1, $zero, 0
-        addi $t2, $zero, 0
-        addi $t3, $zero, 0
-        addi $t4, $zero, 0
-        addi $t6, $t6, 1
-        mthi $zero
-        mtlo $zero
-        jr $ra
-start_test:
-test_slti0:
-        addi $t0, $zero, -1           # t0 = -1
-        slti $t1, $t0, -1             # t1 = 0 
-        bne $t1, $zero, inf   
-        jal reset
+# $8 -> -1
+# $9 -> 1
 
-        addi $t0, $zero, -1           # t0 = -1
-        slti $t1, $t0, 1              # t1 = 1 
-        beq $t1, $zero, inf           # if t1 == 0, fail
-        jal reset
-done:
-        j exit
-inf:
-        addi $t7, $t7, -1
-        j exit
-exit:
-        addiu $v0, $zero, 0xa
+main:   
+test_slti0:
+        slti $9, $8, -1              # $9 = 0 
+        slti $10, $8, -2             # $10 = 0 
+        slti $11, $8, 1              # $11 = 1 
         syscall

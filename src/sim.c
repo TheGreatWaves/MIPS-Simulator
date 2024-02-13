@@ -2,13 +2,6 @@
 #include "shell.h"
 #include "uninspiring_macros.h"
 
-
-/////////////////////////////////////
-// NOTE(Appy): Sign extension
-
-MAKE_SIGN_EXTEND(16)
-MAKE_SIGN_EXTEND(8)
-
 /////////////////////////////////////
 // NOTE(Appy): Registers
 

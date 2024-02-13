@@ -42,5 +42,5 @@ inf:
         addi $t7, $t7, -1
         j exit
 exit:
-        addiu $v0, $zero, 0xa
+        addi $v0, $zero, 0xa
         syscall

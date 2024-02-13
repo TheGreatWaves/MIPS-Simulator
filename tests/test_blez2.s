@@ -1,8 +1,8 @@
 
-
+# BLEZ BGTZ
 # LB LH LW LBU
 # LHU SB SH SW BLTZ BGEZ
-# BLTZAL BGEZAL  
+# BLTZAL BGEZAL SRA 
 
 # This test assumes that all jump and branching instruction works.
 
@@ -21,11 +21,20 @@ reset:
         mtlo $zero
         jr $ra
 start_test:
-test_bltz_take:
-	addi $t0, $zero, -1
-	bltz $t0, bltz_take_1
+test_blez_not_taken:
+        addi $t0, $zero, 100
+        blez $t0, inf
+        jal reset
+test_blez_taken_1:
+	blez $t0 blez_take_zero
 	j inf
-bltz_take_1:
+blez_take_zero:
+	jal reset
+test_blez_taken_2:
+	addi $t0, $zero, -25
+	blez $t0 blez_take_neg
+	j inf 				# jump over this
+blez_take_neg:
 	jal reset
 done:
         j exit
@@ -33,5 +42,5 @@ inf:
         addi $t7, $t7, -1
         j exit
 exit:
-        addiu $v0, $zero, 0xa
+        addi $v0, $zero, 0xa
         syscall
